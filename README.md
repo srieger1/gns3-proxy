@@ -25,17 +25,6 @@ Changes/enhancements to proxy.py:
 - Support REST calls (GET requests with body etc.)
 - Basic access logging/status monitoring support
 
-```Install
--------
-
-To install proxy.py, simply:
-
-	$ pip install --upgrade proxy.py
-
-Using docker:
-
-    $ docker run -it -p 8899:8899 --rm abhinavsingh/proxy.py
-```
 Usage
 -----
 
@@ -44,41 +33,3 @@ Copy gns3-proxy.py and gns3-proxy-config.ini to a host that has Python >=3.4 ins
 host = 192.168.1.100
 
 After that, run gns3-proxy.py and configure GNS3-GUI to use this host as a remote GNS3 server. By default, the proxy listens on 127.0.0.1 and TCP port 14080.
-
-```
-
-$ gns-proxy.py
--h
-usage: proxy.py [-h] [--hostname HOSTNAME] [--port PORT] [--backlog BACKLOG]
-                [--basic-auth BASIC_AUTH]
-                [--server-recvbuf-size SERVER_RECVBUF_SIZE]
-                [--client-recvbuf-size CLIENT_RECVBUF_SIZE]
-                [--log-level LOG_LEVEL]
-
-proxy.py v0.3
-
-optional arguments:
-  -h, --help            show this help message and exit
-  --hostname HOSTNAME   Default: 127.0.0.1
-  --port PORT           Default: 8899
-  --backlog BACKLOG     Default: 100. Maximum number of pending connections to
-                        proxy server
-  --basic-auth BASIC_AUTH
-                        Default: No authentication. Specify colon separated
-                        user:password to enable basic authentication.
-  --server-recvbuf-size SERVER_RECVBUF_SIZE
-                        Default: 8 KB. Maximum amount of data received from
-                        the server in a single recv() operation. Bump this
-                        value for faster downloads at the expense of increased
-                        RAM.
-  --client-recvbuf-size CLIENT_RECVBUF_SIZE
-                        Default: 8 KB. Maximum amount of data received from
-                        the client in a single recv() operation. Bump this
-                        value for faster uploads at the expense of increased
-                        RAM.
-  --log-level LOG_LEVEL
-                        DEBUG, INFO (default), WARNING, ERROR, CRITICAL
-
-Having difficulty using proxy.py? Report at:
-https://github.com/abhinavsingh/proxy.py/issues/new
-```
