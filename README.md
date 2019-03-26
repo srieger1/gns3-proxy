@@ -23,6 +23,7 @@ Changes/enhancements to proxy.py:
 - Filtering of denied requests to server backends (based on username, REST/HTTP method/URL path/headers/body (using regexp)
 - Configuration file to allow basic proxy configuration (as for proxy.py) as well as GNS3 backend server, users, clients, mappings and request filter
 - Support REST calls (GET requests with body etc.)
+- Fixes and tweaks to allow the connection to GNS3 backends, especially keeping connections alive and leaving HTTP headers to support direct passthrough of WebSocket connections
 - Basic access logging/status monitoring support
 
 Usage
