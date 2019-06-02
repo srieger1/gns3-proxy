@@ -1,21 +1,16 @@
 FROM python:3-alpine
-LABEL com.abhinavsingh.name="abhinavsingh/proxy.py" \
-      com.abhinavsingh.description="Lightweight HTTP, HTTPS, WebSockets Proxy Server in a single Python file" \
-#      com.abhinavsingh.build-date="" \
-      com.abhinavsingh.url="https://github.com/abhinavsingh/proxy.py" \
-      com.abhinavsingh.vcs-url="https://github.com/abhinavsingh/proxy.py" \
-#      com.abhinavsingh.vcs-ref="" \
-      com.abhinavsingh.docker.cmd="docker run -it --rm -p 8899:8899 abhinavsingh/proxy.py"
+LABEL de.hs-fulda.netlab.name="flex/gns3-proxy" \
+      de.hs-fulda.netlab.description="GNS3 Proxy (based on proxy.py by Abhinav Singh)" \
+#      de.hs-fulda.netlab.build-date="" \
+      de.hs-fulda.netlab.url="https://github.com/srieger1/gns3-proxy" \
+      de.hs-fulda.netlab.vcs-url="https://github.com/srieger1/gns3-proxy" \
+#      de.hs-fulda.netlab.vcs-ref="" \
+      de.hs-fulda.netlab.docker.cmd="docker run -it --rm -p 14080:14080 flex/gns3-proxy"
 
-COPY proxy.py /app/
-EXPOSE 8899/tcp
+COPY gns3-proxy.py /app/
+COPY gns3-proxy-config.ini /app/
+EXPOSE 14080/tcp
 
 WORKDIR /app
-ENTRYPOINT [ "./proxy.py" ]
-CMD [ "--host=0.0.0.0", \
-      "--port=8899", \
-      "--backlog=100", \
-      "--server-recvbuf-size=8192", \
-      "--client-recvbuf-size=8192", \
-      "--open-file-limit=1024", \
-      "--log-level=INFO" ]
+ENTRYPOINT [ "./gns3-proxy.py" ]
+
