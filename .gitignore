@@ -11,3 +11,5 @@ dist
 build
 proxy.py.egg-info
 proxy.py.iml
+gns3-proxy.egg-info
+gns3-proxy.iml
