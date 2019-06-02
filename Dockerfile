@@ -11,6 +11,8 @@ COPY gns3-proxy.py /app/
 COPY gns3-proxy-config.ini /app/
 EXPOSE 14080/tcp
 
+RUN chmod +x /app/gns3-proxy.py
+
 WORKDIR /app
 ENTRYPOINT [ "./gns3-proxy.py" ]
 
