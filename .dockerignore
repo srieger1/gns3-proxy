@@ -14,7 +14,7 @@ venv
 cover
 dist
 proxy.py.egg-info
-gns3-proxy.egg-info
+gns3_proxy.egg-info
 
 LICENSE
 MANIFEST.in

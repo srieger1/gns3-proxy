@@ -7,12 +7,12 @@ LABEL de.hs-fulda.netlab.name="flex/gns3-proxy" \
 #      de.hs-fulda.netlab.vcs-ref="" \
       de.hs-fulda.netlab.docker.cmd="docker run -it --rm -p 14080:14080 flex/gns3-proxy"
 
-COPY gns3-proxy.py /app/
-COPY gns3-proxy-config.ini /app/
+COPY gns3_proxy.py /app/
+COPY gns3_proxy_config.ini /app/
 EXPOSE 14080/tcp
 
-RUN chmod +x /app/gns3-proxy.py
+RUN chmod +x /app/gns3_proxy.py
 
 WORKDIR /app
-ENTRYPOINT [ "./gns3-proxy.py" ]
+ENTRYPOINT [ "./gns3_proxy.py" ]
 
