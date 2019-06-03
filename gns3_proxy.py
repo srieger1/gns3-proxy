@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-    gns3-proxy.py
+    gns3-proxy
 
     GNS3 Proxy Server in Python.
 
@@ -42,7 +42,7 @@ __version__ = '.'.join(map(str, VERSION[0:2]))
 __description__ = 'GNS3 Proxy based on proxy.py by Abhinav Singh (https://github.com/abhinavsingh/proxy.py)'
 __author__ = 'Sebastian Rieger'
 __author_email__ = 'sebastian@riegers.de'
-__homepage__ = 'https://github.com/srieger1/gns3-proxy.py'
+__homepage__ = 'https://github.com/srieger1/gns3-proxy'
 __download_url__ = '%s/archive/master.zip' % __homepage__
 __license__ = 'BSD'
 # __version__ = '.'.join(map(str, VERSION[0:2]))
@@ -881,9 +881,9 @@ def set_open_file_limit(soft_limit):
 
 
 def main():
-    # parse config file gns3-proxy-config.ini, which must exist in the working directory
+    # parse config file gns3_proxy_config.ini, which must exist in the working directory
     config = configparser.ConfigParser()
-    config.read('gns3-proxy-config.ini')
+    config.read('gns3_proxy_config.ini')
 
     # get hostname
     #
@@ -974,7 +974,7 @@ def main():
 
     # get open-file-limit config
     #
-    # description: Maximum number of files (TCP connections) that gns3-proxy.py can open concurrently.
+    # description: Maximum number of files (TCP connections) that gns3-proxy can open concurrently.
     # default: 8192
     if config.get('proxy', 'open-file-limit'):
         open_file_limit = config.getint('proxy', 'open-file-limit')
