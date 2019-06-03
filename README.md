@@ -1,5 +1,5 @@
-gns3-proxy.py
-=============
+gns3-proxy
+==========
 
 Proof-of-concept for a Proxy Server for GNS3. The proxy is configured as a 
 regular remote server in the GNS3-GUI, as the GNS3-GUI client does not yet 
@@ -43,7 +43,7 @@ Changes/enhancements to proxy.py:
 Usage
 -----
 
-Copy gns3-proxy.py and gns3-proxy-config.ini to a host that has Python >=3.4
+Copy gns3_proxy.py and gns3_proxy_config.ini to a host that has Python >=3.4
 installed. Only change necessary in the GNS3 server, is to edit the regular
 gns3_server.conf (available in the appliance terminal and, e.g., used to
 change username password etc., see also
@@ -53,5 +53,5 @@ listen on, e.g.:
 
 `host = 192.168.1.100`
 
-After that, run gns3-proxy.py and configure GNS3-GUI to use this host as a
+After that, run gns3_proxy.py and configure GNS3-GUI to use this host as a
 remote GNS3 server. By default, the proxy listens on 127.0.0.1 and TCP port 14080.

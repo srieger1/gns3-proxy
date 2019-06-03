@@ -1,11 +1,12 @@
 # -*- coding: utf-8 -*-
 """
-    proxy.py
-    ~~~~~~~~
-    
-    HTTP Proxy Server in Python.
-    
-    :copyright: (c) 2013-2018 by Abhinav Singh.
+    gns3-proxy
+
+    GNS3 Proxy Server in Python.
+
+    based on proxy.py - HTTP Proxy Server in Python - copyright: (c) 2013-2018 by Abhinav Singh
+
+    :copyright: (c) 2019 by Sebastian Rieger.
     :license: BSD, see LICENSE for more details.
 """
 from setuptools import setup
@@ -27,8 +28,8 @@ classifiers = [
     'Operating System :: Unix',
     'Operating System :: Microsoft',
     'Operating System :: OS Independent',
-    'Programming Language :: Python :: 2',
-    'Programming Language :: Python :: 2.7',
+    # 'Programming Language :: Python :: 2',
+    # 'Programming Language :: Python :: 2.7',
     'Programming Language :: Python :: 3',
     'Programming Language :: Python :: 3.7',
     'Topic :: Internet :: Proxy Servers',
@@ -40,7 +41,7 @@ classifiers = [
 ]
 
 setup(
-    name='proxy.py',
+    name='gns3proxy',
     version=proxy.__version__,
     author=proxy.__author__,
     author_email=proxy.__author_email__,

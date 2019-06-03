@@ -1,11 +1,12 @@
 # -*- coding: utf-8 -*-
 """
-    proxy.py
-    ~~~~~~~~
+    gns3-proxy
 
-    HTTP Proxy Server in Python.
+    GNS3 Proxy Server in Python.
 
-    :copyright: (c) 2013-2018 by Abhinav Singh.
+    based on proxy.py - HTTP Proxy Server in Python - copyright: (c) 2013-2018 by Abhinav Singh
+
+    :copyright: (c) 2019 by Sebastian Rieger.
     :license: BSD, see LICENSE for more details.
 """
 import sys
@@ -15,9 +16,9 @@ import logging
 import unittest
 from threading import Thread
 from contextlib import closing
-from proxy import Proxy, ChunkParser, HttpParser, Client
-from proxy import ProxyAuthenticationFailed, ProxyConnectionFailed
-from proxy import CRLF, version, PROXY_TUNNEL_ESTABLISHED_RESPONSE_PKT
+from gns3_proxy import Proxy, ChunkParser, HttpParser, Client
+from gns3_proxy import ProxyAuthenticationFailed, ProxyConnectionFailed
+from gns3_proxy import CRLF, version, PROXY_TUNNEL_ESTABLISHED_RESPONSE_PKT
 
 # logging.basicConfig(level=logging.DEBUG,
 #                     format='%(asctime)s - %(levelname)s - %(funcName)s:%(lineno)d - %(message)s')
