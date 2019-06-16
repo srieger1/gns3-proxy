@@ -1,0 +1,3 @@
+#!/bin/bash
+./stop-gns3proxy-container
+./run-gns3proxy-container

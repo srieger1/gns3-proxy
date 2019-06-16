@@ -1,0 +1,4 @@
+#!/bin/bash
+
+docker kill gns3proxy
+docker rm gns3proxy
