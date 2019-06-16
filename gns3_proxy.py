@@ -486,6 +486,7 @@ class Proxy(threading.Thread):
         self.client_recvbuf_size = client_recvbuf_size
         self.server = None
         self.server_recvbuf_size = server_recvbuf_size
+        self.username = None
 
         self.backend_auth_code = backend_auth_code
         self.backend_port = backend_port
@@ -544,6 +545,7 @@ class Proxy(threading.Thread):
                     # Check submitted password
                     if self.config_users[username] == password:
                         logger.debug("Successfully authenticated user %s" % username)
+                        self.username = username
                     else:
                         logger.error("Wrong password for user %s" % username)
                         raise ProxyAuthenticationFailed()
@@ -681,9 +683,10 @@ class Proxy(threading.Thread):
             logger.info(
                 '%s:%s - %s %s:%s' % (self.client.addr[0], self.client.addr[1], self.request.method, host, port))
         elif self.request.method:
-            logger.info('%s:%s - %s %s:%s%s - %s %s - %s bytes (%s threads)' % (
-                self.client.addr[0], self.client.addr[1], self.request.method, host, port, self.request.build_url(),
-                self.response.code, self.response.reason, len(self.response.raw), threading.active_count()))
+            logger.info('%s:%s (%s) - %s %s:%s%s - %s %s - %s bytes (%s threads)' % (
+                self.client.addr[0], self.client.addr[1], self.username, self.request.method, host, port,
+                self.request.build_url(), self.response.code, self.response.reason, len(self.response.raw),
+                threading.active_count()))
 
     def _get_waitable_lists(self):
         rlist, wlist, xlist = [self.client.conn], [], []
