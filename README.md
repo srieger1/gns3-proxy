@@ -56,7 +56,7 @@ together in a group or on individual projects from at home, will be mapped to an
 load balancing and failover, since GNS3 compared to other network emulation environments does not offer a cluster setup
 to spread running projects and contained resources. The proxy also allows to filter and hence deny requests that
 contain modifications to projects. Prepared projects are periodically synced to all server backends. 
-[Sample scripts](https://github.com/srieger1/gns3-proxy/tree/develop/scripts/backend-sync)
+[Sample scripts](https://github.com/srieger1/gns3-proxy/tree/develop/scripts/backend-sync-example)
 for the synchronization are provided in this repository. 
 
 Installation
