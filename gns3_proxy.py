@@ -11,28 +11,22 @@
     :license: BSD, see LICENSE for more details.
 """
 
-# TODO: user authentication and admin backend abstraction
-# TODO: mapping of users/clients to individual server backends
-# TODO: config of allowed req regexps
-# TODO: document necessary changes in GNS3 appliance (gns3_server.conf: host from 0.0.0.0 to primary IP)
 # TODO: add logging/auditing, monitoring of load etc. (current open connections)
 # TODO: add scheduling/reservation time etc.?
 
 import os
 import sys
-import errno
 import base64
 import socket
 import select
 import logging
-import argparse
 import datetime
 import threading
 from collections import namedtuple
 
 import configparser
 import re
-from ipaddress import ip_address, ip_network
+from ipaddress import ip_address
 
 if os.name != 'nt':
     import resource
@@ -478,7 +472,7 @@ class Proxy(threading.Thread):
     """
 
     def __init__(self, client, backend_auth_code=None, backend_port=13080, server_recvbuf_size=8192,
-                 client_recvbuf_size=8192, default_server=None, config_servers=None, config_clients=None,
+                 client_recvbuf_size=8192, default_server=None, config_servers=None,
                  config_users=None, config_mapping=None, config_deny=None):
         super(Proxy, self).__init__()
 
@@ -494,7 +488,6 @@ class Proxy(threading.Thread):
         self.backend_port = backend_port
         self.default_server = default_server
         self.config_servers = config_servers
-        self.config_clients = config_clients
         self.config_users = config_users
         self.config_mapping = config_mapping
         self.config_deny = config_deny
@@ -532,25 +525,7 @@ class Proxy(threading.Thread):
             # GNS3 Proxy Authentication
             logger.debug("Received request from client %s" % self.client.addr[0])
 
-            # Check if client is defined in config and hence allowed to access the proxy
-            client_authorized = False
-            for key in self.config_clients:
-                access_address = self.config_clients[key]
-                logger.debug("Checking, if %s is in %s to be allowed to access the proxy" % (
-                self.client.addr[0], access_address))
-                if ip_address(self.client.addr[0]) in ip_network(access_address):
-                    logger.debug(
-                        "%s is in %s and therefore allowed to access the proxy" % (self.client.addr[0], access_address))
-                    client_authorized = True
-                    break
-            if client_authorized == False:
-                logger.error(
-                    "Client address %s is not defined in config to be allowed to access the proxy" % self.client.addr[
-                        0])
-                raise ProxyAuthenticationFailed()
-
             # Checking authentication and authorization of user supplied in request
-            username = None
             if b'authorization' in self.request.headers:
                 auth_request = text_(base64.b64decode(self.request.headers[b'authorization'][1][6:])).split(":")
                 username = auth_request[0]
@@ -589,8 +564,10 @@ class Proxy(threading.Thread):
                                 "User matched mapping %s = %s, evaluating deny rule %s" % (item["user"], key, item))
                             logger.debug(
                                 "Debug deny rule %s %s" % (text_(self.request.method), text_(self.request.url.path)))
-                            # logger.info("Method: %s %s %s" % ((re.match(item["method"],text_(self.request.method)), item["method"], text_(self.request.method))))
-                            # logger.info("Path: %s %s %s" % ((re.match(item["url"],text_(self.request.url.path)), item["url"], text_(self.request.url.path))))
+                            # logger.info("Method: %s %s %s" % ((re.match(item["method"],text_(self.request.method)),
+                            #   item["method"], text_(self.request.method))))
+                            # logger.info("Path: %s %s %s" % ((re.match(item["url"],text_(self.request.url.path)),
+                            #   item["url"], text_(self.request.url.path))))
                             if (((item["method"] == "") or re.match(item["method"], text_(self.request.method))) and
                                     (item["url"] == "" or re.match(item["url"], text_(self.request.url.path))) and
                                     (item["header"] == "" or re.match(item["header"], text_(self.request.headers))) and
@@ -606,23 +583,13 @@ class Proxy(threading.Thread):
             # else:
             #    raise Exception('Invalid request\n%s' % self.request.raw)
 
-            # Redirect request based on client and user to appropriate backend server, accroding to mapping from config or default backend server
+            # Redirect request based on client and user to appropriate backend server, according to mapping from config
+            # or default backend server
             backend_server = None
 
-            # Try to find match for client and user in config
-            for item in self.config_mapping:
-                if item["type"] == "client":
-                    for key in self.config_clients:
-                        if re.match(item["match"], key):
-                            logger.debug("Client mapping matched %s = %s" % (item["match"], key))
-                            access_address = self.config_clients[key]
-                            logger.debug("Trying to match %s in %s" % (self.client.addr[0], access_address))
-                            if ip_address(self.client.addr[0]) in ip_network(access_address):
-                                logger.debug("Client matched mapping %s as %s in %s, choosing server %s" % (
-                                item["match"], self.client.addr[0], access_address, item["server"]))
-                                backend_server = self.config_servers[item["server"]]
-                                break
-                elif item["type"] == "user":
+            # Try to find match for user in config
+            if len(self.config_mapping) > 0:
+                for item in self.config_mapping:
                     for key in self.config_users:
                         if re.match(item["match"], key):
                             logger.debug("User mapping matched %s = %s" % (item["match"], key))
@@ -630,22 +597,31 @@ class Proxy(threading.Thread):
                             logger.debug("Trying to match %s as %s" % (username, access_user))
                             if username == access_user:
                                 logger.debug("User matched mapping %s = %s, choosing server %s" % (
-                                item["match"], key, item["server"]))
+                                    item["match"], key, item["server"]))
                                 backend_server = self.config_servers[item["server"]]
                                 break
-                else:
-                    logger.fatal("mapping type %s could not be handled" % item["type"])
-                    raise ProxyAuthenticationFailed()
 
             # if no server was chosen by mapping, try using default, otherwise raise exception
-            if backend_server == None:
-                if not self.default_server == None:
+            if backend_server is None:
+                if self.default_server is not None:
                     # if a default server is set in config, choose this one by default
-                    logger.debug("Redirecting client %s to default backend server %s:%s" % (
-                    self.client.addr[0], backend_server, self.backend_port))
-                    backend_server = self.default_server
+                    if self.default_server in self.config_servers:
+                        logger.debug("Redirecting client %s to default backend server %s:%s" % (
+                            self.client.addr[0], backend_server, self.backend_port))
+                        backend_server = self.config_servers[self.default_server]
+                    else:
+                        try:
+                            backend_server = str(ip_address(self.default_server))
+                            logger.debug("Trying to redirecting client %s to default backend server IP %s:%s" % (
+                                self.client.addr[0], backend_server, self.backend_port))
+                        except ValueError:
+                            logger.fatal(
+                                "Default server %s is neither an entry in server config nor a valid IP address"
+                                % self.default_server)
+                            raise ProxyError()
                 else:
-                    logger.error("Cannot find appropiate server using mapping and no default server defined in config.")
+                    logger.error("Cannot find appropriate server using mapping and no default server defined in "
+                                 "config.")
                     raise ProxyAuthenticationFailed()
 
             self.server = Server(backend_server, self.backend_port)
@@ -666,7 +642,7 @@ class Proxy(threading.Thread):
             # and queue for the server with appropriate headers
             else:
                 self.server.queue(self.request.build(
-                    ### GNS3 Proxy REMOVED
+                    # GNS3 Proxy REMOVED
                     #
                     # del_headers=[b'proxy-authorization', b'proxy-connection', b'connection', b'keep-alive'],
                     # add_headers=[(b'Via', b'1.1 proxy.py v%s' % version), (b'Connection', b'Close')]
@@ -681,9 +657,11 @@ class Proxy(threading.Thread):
         if not self.request.method == b'CONNECT':
             self.response.parse(data)
 
-            ### GNS3 Proxy Example to rewrite response content
+            # GNS3 Proxy Example to rewrite response content
             #
-            # allow rewrite of console_host, does not work, not allowed to change console host in config, needs to be set in gns3_server.conf
+            # allow rewrite of console_host, does not work, not allowed to change console host in config, needs to be
+            # set in gns3_server.conf
+            #
             # if b'x-route' in self.response.headers:
             #    if self.response.headers[b'x-route'][1].lower() == b'/v2/projects/{project_id}/nodes':
             #        logger.info("%s", self.response.headers[b'x-route'])
@@ -840,7 +818,7 @@ class HTTP(TCP):
 
     def __init__(self, hostname='127.0.0.1', port=13080, backlog=100,
                  backend_auth_code=None, backend_port=13080, server_recvbuf_size=8192, client_recvbuf_size=8192,
-                 default_server=None, config_servers=None, config_clients=None, config_users=None, config_mapping=None,
+                 default_server=None, config_servers=None, config_users=None, config_mapping=None,
                  config_deny=None):
         super(HTTP, self).__init__(hostname, port, backlog)
         self.client_recvbuf_size = client_recvbuf_size
@@ -850,7 +828,6 @@ class HTTP(TCP):
         self.backend_port = backend_port
         self.default_server = default_server
         self.config_servers = config_servers
-        self.config_clients = config_clients
         self.config_users = config_users
         self.config_mapping = config_mapping
         self.config_deny = config_deny
@@ -863,7 +840,6 @@ class HTTP(TCP):
                       client_recvbuf_size=self.client_recvbuf_size,
                       default_server=self.default_server,
                       config_servers=self.config_servers,
-                      config_clients=self.config_clients,
                       config_users=self.config_users,
                       config_mapping=self.config_mapping,
                       config_deny=self.config_deny)
@@ -1007,21 +983,6 @@ def main():
     else:
         config_servers = None
 
-    # read clients from config
-    if config.items('clients'):
-        config_clients = dict()
-        client_items = config.items('clients')
-        for key, value in client_items:
-            try:
-                ip_network(value)
-            except ValueError:
-                logger.fatal(
-                    "client config %s is not a valid IP network address (e.g., 1.2.3.4/32 or 1.2.3.0/24)" % value)
-                raise ProxyError()
-            config_clients[key] = value
-    else:
-        config_clients = None
-
     # read users from config
     if config.items('users'):
         config_users = dict()
@@ -1036,33 +997,27 @@ def main():
         config_mapping = list()
         mapping_items = config.items('mapping')
         for key, value in mapping_items:
-            # mapping line must be in format "<type>":"<match>":"<server>", e.g.:
-            #   "user":"user(.*)":"gns3-server-1"
-            #   "client":"local":"gns3-2"
+            # mapping line must be in format "<user match>":"<server>", e.g.:
+            #   "user(.*)":"gns3-server-1"
+            #   "user2":"gns3-2"
 
             # temporarily replace escaped quotation marks to perserve them 
             # tempvalue = str(value).replace("\"","'")
-            if not re.match("^\"([^\"]*)\":\"([^\"]*)\":\"([^\"]*)\"$", value):
+            if not re.match("^\"([^\"]*)\":\"([^\"]*)\"$", value):
                 logger.fatal(
-                    "mapping config not valid. Line %s is not in format \"<client|user>\":\"<match>\":\"<server>\"" % value)
+                    "mapping config not valid. Line %s is not in format \"<user match>\":\"<server>\"" % value)
                 raise ProxyError()
             # cut off quotation mark at beginning and end of line and split components
             mapping_value = str(value[1:-1]).split("\":\"")
             logger.debug("config mapping value %s" % mapping_value)
-            mapping_type = mapping_value[0]
-            mapping_match = mapping_value[1]
-            mapping_server = mapping_value[2]
-            if not mapping_type == "user" and not mapping_type == "client":
-                logger.fatal(
-                    "mapping config not valid. Line %s is not in format \"<client|user>\":\"<match>\":\"<server>\". Type of mapping needs to be either \"user\" or \"client\"" % value)
-                raise ProxyError()
-            try:
-                config_servers[mapping_server]
-            except KeyError:
+            mapping_match = mapping_value[0]
+            mapping_server = mapping_value[1]
+            if mapping_server in config_servers:
+                config_mapping.append({"match": mapping_match, "server": mapping_server})
+            else:
                 logger.fatal("mapping config not valid. Server %s in line %s is not defined in servers." % (
-                mapping_server, value))
+                    mapping_server, value))
                 raise ProxyError()
-            config_mapping.append({"type": mapping_type, "match": mapping_match, "server": mapping_server})
     else:
         config_mapping = None
 
@@ -1071,7 +1026,9 @@ def main():
         config_deny = list()
         deny_items = config.items('deny')
         for key, value in deny_items:
-            # deny line must be in format "<user pattern>":"<http method pattern>":"<http url pattern>":"http header pattern":"http body pattern", e.g.:
+            # deny line must be in format "<user pattern>":"<http method pattern>":"<http url pattern>":
+            #   "http header pattern":"http body pattern", e.g.:
+            #
             #   "user(.*)":"POST":"/nodes$":"":""
             #   "user(.*)":"PUT":"":"":"xyz"
 
@@ -1079,7 +1036,8 @@ def main():
             # tempvalue = str(value).replace("\"","'")
             if not re.match("^\"([^\"]*)\":\"([^\"]*)\":\"([^\"]*)\":\"([^\"]*)\":\"([^\"]*)\"$", value):
                 logger.fatal(
-                    "deny config not valid. Line %s is not in format \"<user pattern>\":\"<http method pattern>\":\"<http url pattern>\":\"http header pattern\":\"http body pattern\"" % value)
+                    "deny config not valid. Line %s is not in format \"<user pattern>\":\"<http method pattern>\":"
+                    "\"<http url pattern>\":\"http header pattern\":\"http body pattern\"" % value)
                 raise ProxyError()
             # cut off quotation mark at beginning and end of line and split components
             deny_value = str(value[1:-1]).split("\":\"")
@@ -1107,7 +1065,6 @@ def main():
     logger.debug("Config log-level: %s" % config_servers)
 
     logger.debug("Config servers: %s" % config_servers)
-    logger.debug("Config clients: %s" % config_clients)
     logger.debug("Config users: %s" % config_users)
     logger.debug("Config mapping: %s" % config_mapping)
     logger.debug("Config deny: %s" % config_deny)
@@ -1124,7 +1081,6 @@ def main():
                      client_recvbuf_size=client_recvbuf_size,
                      default_server=default_server,
                      config_servers=config_servers,
-                     config_clients=config_clients,
                      config_users=config_users,
                      config_mapping=config_mapping,
                      config_deny=config_deny)
