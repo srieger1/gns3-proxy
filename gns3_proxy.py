@@ -31,7 +31,7 @@ from ipaddress import ip_address
 if os.name != 'nt':
     import resource
 
-VERSION = (0, 2)
+VERSION = (0, 3)
 __version__ = '.'.join(map(str, VERSION[0:2]))
 __description__ = 'GNS3 Proxy based on proxy.py by Abhinav Singh (https://github.com/abhinavsingh/proxy.py)'
 __author__ = 'Sebastian Rieger'
