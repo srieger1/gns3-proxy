@@ -10,13 +10,12 @@
     :license: BSD, see LICENSE for more details.
 """
 from setuptools import setup
-import proxy
+import gns3_proxy
 
 classifiers = [
     'Development Status :: 5 - Production/Stable',
     'Environment :: No Input/Output (Daemon)',
     'Environment :: Web Environment',
-    'Intended Audience :: Developers',
     'Intended Audience :: Education',
     'Intended Audience :: System Administrators',
     'License :: OSI Approved :: BSD License',
@@ -41,17 +40,17 @@ classifiers = [
 ]
 
 setup(
-    name='gns3proxy',
-    version=proxy.__version__,
-    author=proxy.__author__,
-    author_email=proxy.__author_email__,
-    url=proxy.__homepage__,
-    description=proxy.__description__,
+    name='gns3-proxy',
+    version=gns3_proxy.__version__,
+    author=gns3_proxy.__author__,
+    author_email=gns3_proxy.__author_email__,
+    url=gns3_proxy.__homepage__,
+    description=gns3_proxy.__description__,
     long_description=open('README.md').read().strip(),
-    download_url=proxy.__download_url__,
+    download_url=gns3_proxy.__download_url__,
     classifiers=classifiers,
-    license=proxy.__license__,
-    py_modules=['proxy'],
-    scripts=['proxy.py'],
+    license=gns3_proxy.__license__,
+    py_modules=['gns3_proxy'],
+    scripts=['gns3_proxy.py'],
     install_requires=[],
 )
