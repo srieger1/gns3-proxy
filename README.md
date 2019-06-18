@@ -130,8 +130,10 @@ user2=pass2
 
 The `[mapping]` section maps users to the backend servers (mapping_id="user regexp":"server_name"), e.g.: 
 
-`mapping1="user2":"gns3-2"`
-`mapping2="user(.*)":"gns3-1"`
+```
+mapping1="user2":"gns3-2"
+mapping2="user(.*)":"gns3-1"
+```
 
 The `[deny]` section defines requests that should be filtered and hence denied by the proxy (rule_id="user regexp":"http_request_method":"url regexp":"header regexp":"body regexp"), e.g. to deny modification to existing projects as well as deletion and creation of projects:
 
