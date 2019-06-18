@@ -11,6 +11,8 @@
     :license: BSD, see LICENSE for more details.
 """
 
+# TODO: modification of requests/responses on-the-fly, e.g., to change advertised GNS3 server version
+# TODO: override server backend for user, e.g., using username@backend as user
 # TODO: add logging/auditing, monitoring of load etc. (current open connections)
 # TODO: add scheduling/reservation time etc.?
 

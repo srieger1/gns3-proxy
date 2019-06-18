@@ -69,16 +69,16 @@ Even easier is the installation using a Docker container. Simply install and run
 container image](https://cloud.docker.com/u/flex/repository/docker/flex/gns3-proxy)
 from Docker Hub, e.g., using
 
-`docker pull flex/gns3-proxy`
+`$ docker pull flex/gns3-proxy`
 
-`docker run -p 0.0.0.0:14080:14080/tcp flex/gns3-proxy`
+`$ docker run -p 0.0.0.0:14080:14080/tcp flex/gns3-proxy`
 
 You can find [sample scripts](https://github.com/srieger1/gns3-proxy/tree/develop/scripts/docker-container-example) to run and manage
 the container in the scripts directory of this repository.
 
 Also, you can install the gns3-proxy from [PyPI](https://pypi.org/project/gns3-proxy/) using
 
-`pip install gns3-proxy`
+`$ pip install gns3-proxy`
 
 Usage
 -----
@@ -116,13 +116,17 @@ The `[proxy]` section contains following parameters for gns3-proxy:
 
 The `[servers]` section contains the defined backend servers (server_name=ip_address), e.g.:
 
-`gns3-1=192.168.76.205`
-`gns3-2=192.168.76.206`
+```
+gns3-1=192.168.76.205
+gns3-2=192.168.76.206
+```
 
 The `[users]` section defines the users allowed to access the proxy and their passwords (username=password), e.g.:
 
-`user1=pass1`
-`user2=pass2`
+```
+user1=pass1
+user2=pass2
+```
 
 The `[mapping]` section maps users to the backend servers (mapping_id="user regexp":"server_name"), e.g.: 
 
@@ -131,9 +135,11 @@ The `[mapping]` section maps users to the backend servers (mapping_id="user rege
 
 The `[deny]` section defines requests that should be filtered and hence denied by the proxy (rule_id="user regexp":"http_request_method":"url regexp":"header regexp":"body regexp"), e.g. to deny modification to existing projects as well as deletion and creation of projects:
 
-`#rule1="user(.*)":"POST":"(.*)/projects$":"":""`
-`#rule2="user(.*)":"POST":"(.*)/nodes$":"":""`
-`#rule3="user(.*)":"POST":"(.*)/links$":"":""`
-`#rule4="user(.*)":"POST":"(.*)/drawings$":"":""`
-`#rule5="user(.*)":"POST":"(.*)/appliances/(.*)":"":""`
-`#rule6="user(.*)":"DELETE":"":"":""`
+```
+rule1="user(.*)":"POST":"(.*)/projects$":"":""
+rule2="user(.*)":"POST":"(.*)/nodes$":"":""
+rule3="user(.*)":"POST":"(.*)/links$":"":""
+rule4="user(.*)":"POST":"(.*)/drawings$":"":""
+rule5="user(.*)":"POST":"(.*)/appliances/(.*)":"":""
+rule6="user(.*)":"DELETE":"":"":""
+```
