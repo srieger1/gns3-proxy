@@ -52,5 +52,5 @@ setup(
     license=gns3_proxy.__license__,
     py_modules=['gns3_proxy'],
     scripts=['gns3_proxy.py'],
-    install_requires=[],
+    install_requires=['requests'],
 )

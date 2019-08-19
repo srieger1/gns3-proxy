@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-    gns3-proxy
+    gns3_proxy
 
     GNS3 Proxy Server in Python.
 
@@ -15,7 +15,7 @@
 # TODO: override server backend for user, e.g., using username@backend as user
 # TODO: add logging/auditing, monitoring of load etc. (current open connections)
 # TODO: add scheduling/reservation time etc.?
-
+import argparse
 import os
 import sys
 import base64
@@ -33,7 +33,13 @@ from ipaddress import ip_address
 if os.name != 'nt':
     import resource
 
-VERSION = (0, 3)
+
+# Default arguments
+DEFAULT_CONFIG_FILE = 'gns3_proxy_config.ini'
+DEFAULT_LOG_LEVEL = 'INFO'
+
+
+VERSION = (0, 4)
 __version__ = '.'.join(map(str, VERSION[0:2]))
 __description__ = 'GNS3 Proxy based on proxy.py by Abhinav Singh (https://github.com/abhinavsingh/proxy.py)'
 __author__ = 'Sebastian Rieger'
@@ -562,7 +568,7 @@ class Proxy(threading.Thread):
             # evaluate denied requests
             for item in self.config_deny:
                 for key in self.config_users:
-                    if re.match(item["user"], key):
+                    if re.fullmatch(item["user"], key):
                         logger.debug("Deny matched user %s = %s" % (item["user"], key))
                         access_user = key
                         logger.debug("Trying to match %s as %s" % (username, access_user))
@@ -571,14 +577,14 @@ class Proxy(threading.Thread):
                                 "User matched mapping %s = %s, evaluating deny rule %s" % (item["user"], key, item))
                             logger.debug(
                                 "Debug deny rule %s %s" % (text_(self.request.method), text_(self.request.url.path)))
-                            # logger.info("Method: %s %s %s" % ((re.match(item["method"],text_(self.request.method)),
+                            # logger.info("Method: %s %s %s" % ((re.fullmatch(item["method"],text_(self.request.method)),
                             #   item["method"], text_(self.request.method))))
-                            # logger.info("Path: %s %s %s" % ((re.match(item["url"],text_(self.request.url.path)),
+                            # logger.info("Path: %s %s %s" % ((re.fullmatch(item["url"],text_(self.request.url.path)),
                             #   item["url"], text_(self.request.url.path))))
-                            if (((item["method"] == "") or re.match(item["method"], text_(self.request.method))) and
-                                    (item["url"] == "" or re.match(item["url"], text_(self.request.url.path))) and
-                                    (item["header"] == "" or re.match(item["header"], text_(self.request.headers))) and
-                                    (item["body"] == "" or re.match(item["body"], text_(self.request.body)))):
+                            if (((item["method"] == "") or re.fullmatch(item["method"], text_(self.request.method))) and
+                                    (item["url"] == "" or re.fullmatch(item["url"], text_(self.request.url.path))) and
+                                    (item["header"] == "" or re.fullmatch(item["header"], text_(self.request.headers))) and
+                                    (item["body"] == "" or re.fullmatch(item["body"], text_(self.request.body)))):
                                 logger.info("Request denied due to matching rule %s", item)
                                 raise ProxyAuthenticationFailed()
 
@@ -598,7 +604,7 @@ class Proxy(threading.Thread):
             if len(self.config_mapping) > 0:
                 for item in self.config_mapping:
                     for key in self.config_users:
-                        if re.match(item["match"], key):
+                        if re.fullmatch(item["match"], key):
                             logger.debug("User mapping matched %s = %s" % (item["match"], key))
                             access_user = key
                             logger.debug("Trying to match %s as %s" % (username, access_user))
@@ -613,9 +619,9 @@ class Proxy(threading.Thread):
                 if self.default_server is not None:
                     # if a default server is set in config, choose this one by default
                     if self.default_server in self.config_servers:
+                        backend_server = self.config_servers[self.default_server]
                         logger.debug("Redirecting client %s to default backend server %s:%s" % (
                             self.client.addr[0], backend_server, self.backend_port))
-                        backend_server = self.config_servers[self.default_server]
                     else:
                         try:
                             backend_server = str(ip_address(self.default_server))
@@ -864,10 +870,33 @@ def set_open_file_limit(soft_limit):
             logger.info('Open file descriptor soft limit set to %d' % soft_limit)
 
 
+def parse_args(args):
+    parser = argparse.ArgumentParser(
+        description='gns3_proxy.py v%s.' % __version__,
+        epilog='gns3_proxy not working? Report at: %s/issues/new' % __homepage__
+    )
+    # Argument names are ordered alphabetically.
+    parser.add_argument('--config-file', type=str, default=DEFAULT_CONFIG_FILE,
+                        help='Location of the gns3_proxy config file. Default: gns3_proxy_config.ini.')
+    parser.add_argument('--log-level', type=str, default=DEFAULT_LOG_LEVEL,
+                        help='Valid options: DEBUG, INFO (default), WARNING, ERROR, CRITICAL. '
+                             'Both upper and lowercase values are allowed.'
+                             'You may also simply use the leading character e.g. --log-level d')
+
+    return parser.parse_args(args)
+
+
 def main():
-    # parse config file gns3_proxy_config.ini, which must exist in the working directory
+    # parse arguments
+    args = parse_args(sys.argv[1:])
+
+    logging.basicConfig(level=getattr(logging, args.log_level),
+                        format='%(asctime)s - %(levelname)s - %(funcName)s:%(lineno)d - %(message)s')
+
+    # parse config file gns3_proxy_config.ini
     config = configparser.ConfigParser()
-    config.read('gns3_proxy_config.ini')
+    config.read_file(open(args.config_file))
+    config.read(args.config_file)
 
     # get hostname
     #
@@ -965,18 +994,6 @@ def main():
     else:
         open_file_limit = 1024
 
-    # get log-level config
-    #
-    # description: DEBUG, INFO, WARNING, ERROR, CRITICAL
-    # default: INFO
-    if config.get('proxy', 'log-level'):
-        log_level = config.get('proxy', 'log-level')
-    else:
-        log_level = "INFO"
-
-    logging.basicConfig(level=getattr(logging, log_level),
-                        format='%(asctime)s - %(levelname)s - %(funcName)s:%(lineno)d - %(message)s')
-
     # read servers from config
     if config.items('servers'):
         config_servers = dict()
@@ -1011,7 +1028,7 @@ def main():
 
             # temporarily replace escaped quotation marks to preserve them
             # tempvalue = str(value).replace("\"","'")
-            if not re.match("^\"([^\"]*)\":\"([^\"]*)\"$", value):
+            if not re.fullmatch("^\"([^\"]*)\":\"([^\"]*)\"$", value):
                 logger.fatal(
                     "mapping config not valid. Line %s is not in format \"<user match>\":\"<server>\"" % value)
                 raise ProxyError()
@@ -1042,7 +1059,7 @@ def main():
 
             # temporarily replace escaped quotation marks to perserve them 
             # tempvalue = str(value).replace("\"","'")
-            if not re.match("^\"([^\"]*)\":\"([^\"]*)\":\"([^\"]*)\":\"([^\"]*)\":\"([^\"]*)\"$", value):
+            if not re.fullmatch("^\"([^\"]*)\":\"([^\"]*)\":\"([^\"]*)\":\"([^\"]*)\":\"([^\"]*)\"$", value):
                 logger.fatal(
                     "deny config not valid. Line %s is not in format \"<user pattern>\":\"<http method pattern>\":"
                     "\"<http url pattern>\":\"http header pattern\":\"http body pattern\"" % value)
@@ -1070,7 +1087,6 @@ def main():
     logger.debug("Config server-recvbuf-size: %s" % server_recvbuf_size)
     logger.debug("Config client-recvbuf-size: %s" % client_recvbuf_size)
     logger.debug("Config open-file-limit: %s" % open_file_limit)
-    logger.debug("Config log-level: %s" % config_servers)
 
     logger.debug("Config servers: %s" % config_servers)
     logger.debug("Config users: %s" % config_users)

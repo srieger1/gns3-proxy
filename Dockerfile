@@ -8,6 +8,7 @@ LABEL de.hs-fulda.netlab.name="flex/gns3-proxy" \
       de.hs-fulda.netlab.docker.cmd="docker run -it --rm -p 14080:14080 flex/gns3-proxy"
 
 COPY gns3_proxy.py /app/
+COPY gns3_proxy_*.py /app/
 COPY gns3_proxy_config.ini /app/
 EXPOSE 14080/tcp
 
