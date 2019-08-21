@@ -17,6 +17,7 @@
 # TODO: add scheduling/reservation, replication, start/stop time etc.?
 # TODO: detect "console_host": "0.0.0.0" and give warning
 # TODO: web interface for manual replication and start/stop
+# TODO: proxy.py updates esp. multi processing?
 
 import argparse
 import os
