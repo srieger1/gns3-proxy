@@ -11,6 +11,8 @@
     :license: BSD, see LICENSE for more details.
 """
 
+# TODO: --force und --project-id, --project-name arguments?
+
 import argparse
 import configparser
 import json
@@ -136,11 +138,11 @@ def main():
     # get backend_port
     #
     # description: TCP port to use to access backend GNS3 server
-    # default: 13080
+    # default: 3080
     if config.get('proxy', 'backend_port'):
         backend_port = config.getint('proxy', 'backend_port')
     else:
-        backend_port = 13080
+        backend_port = 3080
 
     # read servers from config
     if config.items('servers'):
@@ -286,20 +288,6 @@ def main():
                         logger.fatal("Unable to import project on target server.")
                         raise ProxyError()
 
-                # logger.info("Opening destination project")
-                # # Starting project
-                # url = base_dst_api_url + '/projects/' + str(project_uuid) + "/open"
-                # data = "{}"
-                # r = requests.post(url, data, auth=(username, password))
-                # r.text
-                #
-                # logger.info("Starting destination project")
-                # # Starting project
-                # url = base_dst_api_url + '/projects/' + str(project_uuid) + "/nodes/start"
-                # data = "{}"
-                # r = requests.post(url, data, auth=(username, password))
-                # r.text
-
                 if args.regenerate_mac_address or args.inject_replication_note:
                     # open target project
                     logger.debug("Open imported project to make changes.")
@@ -388,13 +376,6 @@ def main():
 
             # project is replicated close temp file
             tmp_file.close()
-
-            # detect "console_host": "0.0.0.0" and give warning
-
-            # schedule replicating
-            # schedule start/stop
-
-            # web interface for manual replication and start/stop
 
         logger.info("Done")
 
