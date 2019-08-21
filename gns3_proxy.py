@@ -14,7 +14,10 @@
 # TODO: modification of requests/responses on-the-fly, e.g., to change advertised GNS3 server version
 # TODO: override server backend for user, e.g., using username@backend as user
 # TODO: add logging/auditing, monitoring of load etc. (current open connections)
-# TODO: add scheduling/reservation time etc.?
+# TODO: add scheduling/reservation, replication, start/stop time etc.?
+# TODO: detect "console_host": "0.0.0.0" and give warning
+# TODO: web interface for manual replication and start/stop
+
 import argparse
 import os
 import sys
@@ -482,7 +485,7 @@ class Proxy(threading.Thread):
     Accepts `Client` connection object and act as a proxy between client and server.
     """
 
-    def __init__(self, client, backend_auth_code=None, backend_port=13080, server_recvbuf_size=8192,
+    def __init__(self, client, backend_auth_code=None, backend_port=3080, server_recvbuf_size=8192,
                  client_recvbuf_size=8192, default_server=None, config_servers=None,
                  config_users=None, config_mapping=None, config_deny=None):
         super(Proxy, self).__init__()
@@ -831,7 +834,7 @@ class HTTP(TCP):
     """
 
     def __init__(self, hostname='127.0.0.1', port=13080, backlog=100,
-                 backend_auth_code=None, backend_port=13080, server_recvbuf_size=8192, client_recvbuf_size=8192,
+                 backend_auth_code=None, backend_port=3080, server_recvbuf_size=8192, client_recvbuf_size=8192,
                  default_server=None, config_servers=None, config_users=None, config_mapping=None,
                  config_deny=None):
         super(HTTP, self).__init__(hostname, port, backlog)
@@ -939,11 +942,11 @@ def main():
     # get backend_port
     #
     # description: TCP port to use to access backend GNS3 server
-    # default: 13080
+    # default: 3080
     if config.get('proxy', 'backend_port'):
         backend_port = config.getint('proxy', 'backend_port')
     else:
-        backend_port = 13080
+        backend_port = 3080
 
     # get default_server
     #
@@ -1082,7 +1085,7 @@ def main():
     logger.debug("Config backend_user: %s" % backend_user)
     logger.debug("Config backend_password: %s" % backend_password)
     logger.debug("Config backend_port: %s" % backend_port)
-    logger.debug("Config default_server: %s" % config_servers)
+    logger.debug("Config default_server: %s" % default_server)
     logger.debug("Config backlog: %s" % backlog)
     logger.debug("Config server-recvbuf-size: %s" % server_recvbuf_size)
     logger.debug("Config client-recvbuf-size: %s" % client_recvbuf_size)
