@@ -12,6 +12,7 @@
 """
 
 # TODO: --force und --project-id, --project-name arguments?
+# TODO: replicate images/appliances? symbols/templages etc.?
 
 import argparse
 import configparser
