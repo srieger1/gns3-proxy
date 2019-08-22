@@ -384,13 +384,10 @@ def main():
                            '<text fill=\\"#000000\\" fill-opacity=\\"1.0\\" font-family=\\"TypeWriter\\"' \
                            ' font-size=\\"10.0\\" font-weight=\\"bold\\">' \
                            'Server: ' + str(target_server_address).replace('"', '\\"') + '\\n' \
-                                                                                         'Replicated from: ' + str(
-                        args.source_server).replace('"', '\\"') + ' ' \
-                                                                  'Project: ' + str(args.project).replace('"',
-                                                                                                          '\\"') + '\\n' \
-                                                                                                                   'Replicated at: ' + str(
-                        replication_timestamp).replace('"', '\\"') + '\\n' \
-                                                                     '</text></svg>" }'
+                           'Replicated from: ' + str(args.source_server).replace('"', '\\"') + ' ' \
+                           'Project: ' + str(args.project).replace('"', '\\"') + '\\n' \
+                           'Replicated at: ' + str(replication_timestamp).replace('"', '\\"') + '\\n' \
+                           '</text></svg>" }'
                     r = requests.post(url, data, auth=(username, password))
                     if not r.status_code == 201:
                         logger.fatal("Unable to inject a note describing the replication details in the project")
