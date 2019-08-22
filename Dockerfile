@@ -21,4 +21,4 @@ RUN chmod +x /usr/local/bin/*.py
 RUN pip install requests
 
 WORKDIR /home/gns3_proxy
-CMD ['sh', '-c', 'crond && gns3_proxy.py']
+CMD ["sh", "-c", "crond && gns3_proxy.py"]
