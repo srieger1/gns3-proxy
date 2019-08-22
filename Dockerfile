@@ -7,12 +7,18 @@ LABEL de.hs-fulda.netlab.name="flex/gns3-proxy" \
 #      de.hs-fulda.netlab.vcs-ref="" \
       de.hs-fulda.netlab.docker.cmd="docker run -it --rm -p 14080:14080 flex/gns3-proxy"
 
-COPY gns3_proxy.py /app/
-COPY gns3_proxy_*.py /app/
-COPY gns3_proxy_config.ini /app/
+RUN adduser -S gns3_proxy
+
+COPY gns3_proxy.py /usr/local/bin
+COPY gns3_proxy_*.py /usr/local/bin
+COPY gns3_proxy_config.ini /home/gns3_proxy/
+COPY gns3_proxy_crontab /var/spool/cron/crontabs
+
 EXPOSE 14080/tcp
 
-RUN chmod +x /app/gns3_proxy.py
+RUN chmod +x /usr/local/bin/*.py
 
-WORKDIR /app
-CMD ["./gns3_proxy.py"]
+RUN pip install requests
+
+WORKDIR /home/gns3_proxy
+CMD ['sh', '-c', 'crond && gns3_proxy.py']

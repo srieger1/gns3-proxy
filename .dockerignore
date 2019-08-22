@@ -16,6 +16,8 @@ dist
 proxy.py.egg-info
 gns3_proxy.egg-info
 
+gns3_proxy_config_hsfd.ini
+
 LICENSE
 MANIFEST.in
 README.md
