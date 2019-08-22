@@ -14,10 +14,10 @@
 # TODO: modification of requests/responses on-the-fly, e.g., to change advertised GNS3 server version
 # TODO: override server backend for user, e.g., using username@backend as user
 # TODO: add logging/auditing, monitoring of load etc. (current open connections)
-# TODO: add scheduling/reservation, replication, start/stop time etc.?
 # TODO: detect "console_host": "0.0.0.0" and give warning
 # TODO: web interface for manual replication and start/stop
 # TODO: proxy.py updates esp. multi processing?
+# TODO: add reservation system/ldap integration?
 
 import argparse
 import os

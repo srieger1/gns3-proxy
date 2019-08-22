@@ -1,2 +1,0 @@
-#!/bin/bash
-docker run -itd --name gns3proxy -v $(pwd)/gns3_proxy_config.ini:/app/gns3_proxy_config.ini:ro -p 0.0.0.0:14080:14080/tcp flex/gns3-proxy
