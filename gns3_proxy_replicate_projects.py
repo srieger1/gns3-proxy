@@ -11,7 +11,6 @@
     :license: BSD, see LICENSE for more details.
 """
 
-# TODO: --force und --project-id, --project-name arguments?
 # TODO: replicate images/appliances? symbols/templages etc.?
 
 import argparse
@@ -26,7 +25,6 @@ import random
 import datetime
 import tempfile
 import requests
-
 
 VERSION = (0, 1)
 __version__ = '.'.join(map(str, VERSION[0:2]))
@@ -63,6 +61,7 @@ DEFAULT_CONFIG_FILE = 'gns3_proxy_config.ini'
 DEFAULT_DELETE_TARGET_PROJECT = False
 DEFAULT_INJECT_REPLICATION_NOTE = False
 DEFAULT_LOG_LEVEL = 'INFO'
+DEFAULT_FORCE = False
 
 
 class ProxyError(Exception):
@@ -80,6 +79,9 @@ def parse_args(args):
     parser.add_argument('--delete-target-project', action='store_true', default=DEFAULT_DELETE_TARGET_PROJECT,
                         help='Whether to delete target project before import.'
                              'By default project will not be deleted on target server, if it already exists.')
+    parser.add_argument('--force', action='store_true', default=DEFAULT_FORCE,
+                        help='Force action without further prompt. E.g., overwrite or delete existing projects '
+                             'without further verification.')
     parser.add_argument('--inject-replication-note', action='store_true', default=DEFAULT_INJECT_REPLICATION_NOTE,
                         help='Whether to inject a note containing the target server name and additional replication'
                              'details in the target project.')
@@ -87,9 +89,12 @@ def parse_args(args):
                         help='Valid options: DEBUG, INFO (default), WARNING, ERROR, CRITICAL. '
                              'Both upper and lowercase values are allowed.'
                              'You may also simply use the leading character e.g. --log-level d')
-    parser.add_argument('--project', type=str, required=True,
-                        help='Project name or UUID to copy. Can be specified as a regular expression to match '
-                             'multiple projects.')
+    project_group = parser.add_mutually_exclusive_group(required=True)
+    project_group.add_argument('--project-id', type=str,
+                               help='Project UUID to copy.')
+    project_group.add_argument('--project-name', type=str,
+                               help='Project name to copy. Can be specified as a regular expression to match '
+                                    'multiple projects.')
     parser.add_argument('--regenerate-mac-address', type=str,
                         help='Specify a mac address that should be regenerated in the replicated target project. '
                              'This is, e.g., necessary for interfaces using DHCP to an external network, i.e., '
@@ -184,25 +189,31 @@ def main():
         base_src_api_url = "http://" + src_server + ":" + str(backend_port) + "/v2"
 
         logger.debug("Searching source project UUIDs")
-        project_uuids = list()
+        projects = list()
         url = base_src_api_url + '/projects'
         r = requests.get(url, auth=(username, password))
         if not r.status_code == 200:
             logger.fatal("Could not list projects.")
             raise ProxyError()
         else:
-            projects = json.loads(r.text)
-            for project in projects:
-                if re.fullmatch(args.project, project['name']) or re.fullmatch(args.project, project['project_id']):
-                    logger.debug('matched %s' % project)
-                    project_uuids.append(project['project_id'])
+            project_results = json.loads(r.text)
+            for project in project_results:
+                if args.project_id:
+                    if args.project_id == project['project_id']:
+                        logger.debug('matched UUID of: %s' % project)
+                        projects.append(project)
+                else:
+                    if re.fullmatch(args.project_name, project['name']):
+                        logger.debug('matched name of: %s' % project)
+                        projects.append(project)
 
-        if len(project_uuids) == 0:
+        if len(projects) == 0:
             logger.fatal("Specified project not found.")
             raise ProxyError()
 
-        for project_uuid in project_uuids:
-            logger.info("#### Replicating project: %s" % project_uuid)
+        for project in projects:
+            project_uuid = project['project_id']
+            print("#### Replicating project: %s" % project_uuid)
             tmp_file = tempfile.TemporaryFile()
 
             # close source project
@@ -251,8 +262,20 @@ def main():
                 raise ProxyError()
 
             for target_server_address in target_server_addresses:
-                logger.info("    #### Replicating project: %s to server: %s" % (project_uuid, target_server_address))
+                print("    #### Replicating project: %s to server: %s" % (project_uuid, target_server_address))
                 base_dst_api_url = "http://" + target_server_address + ":" + str(backend_port) + "/v2"
+
+                logger.debug("Checking if target project exists...")
+                url = base_dst_api_url + '/projects/' + project_uuid
+                r = requests.get(url, auth=(username, password))
+                if r.status_code == 200:
+                    if args.force:
+                        print("         Project UUID: %s already exists on server: %s overwriting it."
+                              % (project_uuid, target_server_address))
+                    else:
+                        print("         WARNING: Project UUID: %s already exists on server: %s. Use --force"
+                              " to overwrite." % (project_uuid, target_server_address))
+                        continue
 
                 # close destination project
                 logger.debug("Closing destination project")
@@ -266,14 +289,19 @@ def main():
                         raise ProxyError()
 
                 if args.delete_target_project:
-                    logger.debug("Deleting destination project")
-                    r = requests.delete(base_dst_api_url + '/projects/' + project_uuid, auth=(username, password))
-                    if not r.status_code == 204:
-                        if r.status_code == 404:
-                            logger.debug("Destination project did not exist before, not deleted")
-                        else:
-                            logger.fatal("unable to delete project")
-                            raise ProxyError()
+                    if args.force:
+                        logger.debug("Deleting destination project")
+                        r = requests.delete(base_dst_api_url + '/projects/' + project_uuid, auth=(username, password))
+                        if not r.status_code == 204:
+                            if r.status_code == 404:
+                                logger.debug("Destination project did not exist before, not deleted")
+                            else:
+                                logger.fatal("unable to delete project")
+                                raise ProxyError()
+                    else:
+                        print("        WARNING: Project UUID %s to delete found on server: %s, use --force to really "
+                              "remove it." % (project_uuid, target_server_address))
+                        continue
 
                 logger.debug("Importing destination project")
                 # import project
@@ -318,16 +346,16 @@ def main():
                                     if re.fullmatch(args.regenerate_mac_address,
                                                     node['properties']['mac_address']):
                                         logger.debug('Found MAC address that needs to be changed: %s using match: %s'
-                                                    % (node['properties']['mac_address'],
-                                                       args.regenerate_mac_address))
+                                                     % (node['properties']['mac_address'],
+                                                        args.regenerate_mac_address))
                                         mac_address = "02:01:00:%02x:%02x:%02x" % (random.randint(0, 255),
                                                                                    random.randint(0, 255),
                                                                                    random.randint(0, 255))
                                         # changing mac address in target project node
-                                        logger.info("         Changing mac address of node: %s from: %s to: %s"
+                                        print("         Changing mac address of node: %s from: %s to: %s"
                                                     % (node['name'], node['properties']['mac_address'], mac_address))
                                         url = base_dst_api_url + '/projects/' + project_uuid + "/nodes/" \
-                                            + node['node_id']
+                                              + node['node_id']
                                         data = '{ "properties": { "mac_address": "' + mac_address + '" } }'
                                         r = requests.put(url, data, auth=(username, password))
                                         if not r.status_code == 200:
@@ -356,10 +384,13 @@ def main():
                            '<text fill=\\"#000000\\" fill-opacity=\\"1.0\\" font-family=\\"TypeWriter\\"' \
                            ' font-size=\\"10.0\\" font-weight=\\"bold\\">' \
                            'Server: ' + str(target_server_address).replace('"', '\\"') + '\\n' \
-                           'Replicated from: ' + str(args.source_server).replace('"', '\\"') + ' ' \
-                           'Project: ' + str(args.project).replace('"', '\\"') + '\\n' \
-                           'Replicated at: ' + str(replication_timestamp).replace('"', '\\"') + '\\n' \
-                           '</text></svg>" }'
+                                                                                         'Replicated from: ' + str(
+                        args.source_server).replace('"', '\\"') + ' ' \
+                                                                  'Project: ' + str(args.project).replace('"',
+                                                                                                          '\\"') + '\\n' \
+                                                                                                                   'Replicated at: ' + str(
+                        replication_timestamp).replace('"', '\\"') + '\\n' \
+                                                                     '</text></svg>" }'
                     r = requests.post(url, data, auth=(username, password))
                     if not r.status_code == 201:
                         logger.fatal("Unable to inject a note describing the replication details in the project")
@@ -378,7 +409,7 @@ def main():
             # project is replicated close temp file
             tmp_file.close()
 
-        logger.info("Done")
+        print("Done.")
 
     except KeyboardInterrupt:
         pass

@@ -215,7 +215,7 @@ def main():
                                         raise ProxyError()
 
                                 # deleting project
-                                logger.info("Deleting existing project UUID %s on server: %s"
+                                print("Deleting existing project UUID %s on server: %s"
                                             % (project_uuid, config_servers[server]))
                                 r = requests.delete(base_dst_api_url + '/projects/' + project_uuid,
                                                     auth=(username, password))
@@ -225,26 +225,28 @@ def main():
                                     else:
                                         logger.fatal("unable to delete project")
                                         raise ProxyError()
-                            else:
-                                logger.fatal("Project UUID: %s already exists on server: %s import failed, use --force "
-                                             "to overwrite." % (project_uuid, config_servers[server]))
 
-                            logger.debug("Importing project")
-                            # import project
-                            url = base_dst_api_url + '/projects/' + project_uuid + "/import"
-                            files = {'file': open(args.import_from_file, 'rb')}
-                            r = requests.post(url, files=files, auth=(username, password))
-                            if not r.status_code == 201:
-                                if r.status_code == 403:
-                                    logger.fatal("Forbidden to import project on target server.")
-                                    raise ProxyError()
-                                else:
-                                    logger.fatal("Unable to import project on target server.")
-                                    raise ProxyError()
                             else:
-                                logger.info("#### Project %s imported from file: %s on server: %s"
-                                            % (project_uuid, args.import_from_file, server))
+                                logger.fatal("    WARNING: Project UUID: %s already exists on server: %s import "
+                                             "failed, use --force to overwrite."
+                                             % (project_uuid, config_servers[server]))
+                                continue
 
+                        logger.debug("Importing project")
+                        # import project
+                        url = base_dst_api_url + '/projects/' + project_uuid + "/import"
+                        files = {'file': open(args.import_from_file, 'rb')}
+                        r = requests.post(url, files=files, auth=(username, password))
+                        if not r.status_code == 201:
+                            if r.status_code == 403:
+                                logger.fatal("Forbidden to import project on target server.")
+                                raise ProxyError()
+                            else:
+                                logger.fatal("Unable to import project on target server.")
+                                raise ProxyError()
+                        else:
+                            print("#### Project %s imported from file: %s on server: %s"
+                                        % (project_uuid, args.import_from_file, server))
                     else:
                         logger.debug("Searching target project UUIDs")
                         projects = list()
@@ -290,7 +292,7 @@ def main():
                                     filename = str(server) + "_" + project['name'] + "_" + project_uuid + "_" + \
                                                              time.strftime("%Y%m%d-%H%M%S") + ".zip"
                                     shutil.copyfileobj(r.raw, open(os.path.join(args.export_to_dir, filename), 'wb'))
-                                    logger.info("#### Project %s (%s) exported to file: %s from server: %s"
+                                    print("#### Project %s (%s) exported to file: %s from server: %s"
                                                 % (project['name'], project['project_id'], filename, server))
                                 else:
                                     logger.fatal("Unable to export project from source server.")
@@ -310,7 +312,7 @@ def main():
                                             raise ProxyError()
 
                                     # deleting project
-                                    logger.info("#### Deleting project UUID %s on server: %s"
+                                    print("#### Deleting project UUID %s on server: %s"
                                                 % (project_uuid, config_servers[server]))
                                     r = requests.delete(base_dst_api_url + '/projects/' + project_uuid,
                                                         auth=(username, password))
@@ -321,15 +323,15 @@ def main():
                                             logger.fatal("unable to delete project")
                                             raise ProxyError()
                                 else:
-                                    logger.fatal("Project UUID %s to delete found on server: %s, use --force to really "
-                                                 "remove it." % (project_uuid, config_servers[server]))
+                                    print("    WARNING: Project UUID %s to delete found on server: %s, use --force to really "
+                                          "remove it." % (project_uuid, config_servers[server]))
 
                             if args.show:
-                                logger.info("#### Server: %s, Project Name: %s, Project_ID: %s, Status: %s, "
+                                print("#### Server: %s, Project Name: %s, Project_ID: %s, Status: %s, "
                                             % (server, project['name'], project['project_id'], project['status']))
 
                             if args.start:
-                                logger.info(
+                                print(
                                     "#### Opening and starting project: %s on %s" % (project['project_id'], server))
 
                                 # Opening project
@@ -351,7 +353,7 @@ def main():
                                     raise ProxyError()
 
                             if args.stop:
-                                logger.info(
+                                print(
                                     "#### Stopping and closing project: %s on %s" % (project['project_id'], server))
 
                                 # Stopping project
@@ -372,7 +374,7 @@ def main():
                                     logger.fatal("Unable to close project. Project does not exist or is corrupted?")
                                     raise ProxyError()
 
-        logger.info("Done")
+        print("Done.")
 
     except KeyboardInterrupt:
         pass
