@@ -9,10 +9,10 @@ LABEL de.hs-fulda.netlab.name="flex/gns3-proxy" \
 
 RUN adduser -S gns3_proxy
 
-COPY gns3_proxy.py /usr/local/bin
-COPY gns3_proxy_*.py /usr/local/bin
+COPY gns3_proxy.py /usr/local/bin/
+COPY gns3_proxy_*.py /usr/local/bin/
 COPY gns3_proxy_config.ini /home/gns3_proxy/
-COPY gns3_proxy_crontab /var/spool/cron/crontabs
+COPY gns3_proxy_crontab /var/spool/cron/crontabs/
 
 EXPOSE 14080/tcp
 

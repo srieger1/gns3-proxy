@@ -216,7 +216,7 @@ def main():
 
                                 # deleting project
                                 print("Deleting existing project UUID %s on server: %s"
-                                            % (project_uuid, config_servers[server]))
+                                      % (project_uuid, config_servers[server]))
                                 r = requests.delete(base_dst_api_url + '/projects/' + project_uuid,
                                                     auth=(username, password))
                                 if not r.status_code == 204:
@@ -323,8 +323,8 @@ def main():
                                             logger.fatal("unable to delete project")
                                             raise ProxyError()
                                 else:
-                                    print("    WARNING: Project UUID %s to delete found on server: %s, use --force to really "
-                                          "remove it." % (project_uuid, config_servers[server]))
+                                    print("    WARNING: Project UUID %s to delete found on server: %s, use --force"
+                                          " to really remove it." % (project_uuid, config_servers[server]))
 
                             if args.show:
                                 print("#### Server: %s, Project Name: %s, Project_ID: %s, Status: %s, "
