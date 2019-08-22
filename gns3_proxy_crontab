@@ -1,11 +1,20 @@
 # gns3 proxy crontab, will be copy to /var/spool/cron/crontabs/ by default
 SHELL=/bin/ash
-PATH='/usr/local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/app'
+PATH='/usr/local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/home/gns3_proxy'
 
 # m h dom mon dow    command
-#0 * * * *     gns3_proxy_manage_projects.py --show --project-name "(.*)" --target "(.*)"
 
-#0 1 * * *     gns3_proxy_manage_projects.py --start --project-name TestProject --target gns3-1
+### Example saving the status of all projects on all backends to /tmp/project_status each minute
+#* * * * *     gns3_proxy_manage_projects.py --show --project-name "(.*)" --target "(.*)" >/tmp/project_status
+
+### Example for automatic start and stop of projects, e.g., to have projects ready to be used for lab or course
+#0 1 * * *     gns3_proxy_manage_projects.py --start --project-name "TestProject(.*)" --target gns3-1
 #30 1 * * *    gns3_proxy_manage_projects.py --stop --project-name TestProject --target gns3-1
+#0 2 * * *     gns3_proxy_manage_projects.py --stop --project-id f1d1e2b8-c41f-42cf-97d4-513f3fd01cd2 --target gns3-1
+#10 11 * * 4     gns3_proxy_manage_projects.py --project-name "KommProtUeb3" --target-server "gns3-(.*)" --start
+#20 13 * * 4     gns3_proxy_manage_projects.py --project-name "KommProtUeb3" --target-server "gns3-(.*)" --stop
 
-#0 2 * * *     gns3_proxy_replicate_projects.py --source gns3-master --target "gns3-(.*)" --project-name TestProject
+### Example for replication of projects to gns3 proxy backends
+#0 2 * * *     gns3_proxy_replicate_projects.py --source gns3-master --target "gns3-(.*)" --project-name TestProject1 --force
+#0 3 * * *     gns3_proxy_replicate_projects.py --source gns3-master --target "gns3-2" --project-id f1d1e2b8-c41f-42cf-97d4-513f3fd01cd2 --force
+#0 4 * * *     gns3_proxy_replicate_projects.py --source gns3-master --target "gns3-(.*)" --project-name "KommProt(.*)" --regenerate-mac-address "02:01:00:(.*)" --force
