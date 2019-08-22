@@ -15,5 +15,4 @@ EXPOSE 14080/tcp
 RUN chmod +x /app/gns3_proxy.py
 
 WORKDIR /app
-ENTRYPOINT [ "./gns3_proxy.py" ]
-
+CMD ["./gns3_proxy.py"]
