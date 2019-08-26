@@ -152,8 +152,8 @@ rule5="user(.*)":"POST":"(.*)/appliances/(.*)":"":""
 rule6="user(.*)":"DELETE":"":"":""
 ```
 
-Managing projects across gns3-proxy backends
---------------------------------------------
+Deploying and managing projects on gns3-proxy backends
+------------------------------------------------------
 
 [gns3_proxy_replicate_projects.py](https://github.com/srieger1/gns3-proxy/blob/develop/gns3_proxy_replicate_projects.py) facilitates the replication of projects across backend servers.
 Command syntax is:
