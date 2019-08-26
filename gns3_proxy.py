@@ -15,6 +15,7 @@
 # TODO: modification of requests/responses on-the-fly, e.g., to change advertised GNS3 server version?
 # TODO: add logging/auditing, monitoring of load etc. (current open connections)
 # TODO: proxy.py updates esp. multi processing?
+# TODO: code refactoring/removing unused proxy.py code
 
 # TODO: show proxy errors (e.g., console_host misconfig) explicitly in GNS3 GUI - if possible?
 # TODO: web interface for manual replication and start/stop
@@ -43,7 +44,7 @@ if os.name != 'nt':
 DEFAULT_CONFIG_FILE = 'gns3_proxy_config.ini'
 DEFAULT_LOG_LEVEL = 'INFO'
 
-VERSION = (0, 4)
+VERSION = (0, 5)
 __version__ = '.'.join(map(str, VERSION[0:2]))
 __description__ = 'GNS3 Proxy based on proxy.py by Abhinav Singh (https://github.com/abhinavsingh/proxy.py)'
 __author__ = 'Sebastian Rieger'

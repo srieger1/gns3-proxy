@@ -86,8 +86,8 @@ Also, you can install the gns3-proxy from [PyPI](https://pypi.org/project/gns3-p
 
 `$ pip install gns3-proxy`
 
-Usage
------
+Preparing GNS3 server backends
+------------------------------
 
 The only change necessary in the GNS3 server backends, is to edit the regular
 gns3_server.conf (available in the appliance terminal and, e.g., used to
@@ -98,9 +98,9 @@ listen on, e.g.:
 
 `host = 192.168.1.100`
 
-After you changed the config of the GNS3 backend servers, configure gns3_proxy_config.ini based on your needs and
-run gns3_proxy.py. You can then, configure GNS3-GUI to use the proxy as a remote GNS3 server. By default, the proxy
-listens on 0.0.0.0 and TCP port 14080.
+After you changed the config of the GNS3 backend servers and restarted them, configure gns3_proxy_config.ini based
+on your needs and run gns3_proxy.py. You can then, configure GNS3-GUI to use the proxy as a remote GNS3 server. 
+By default, the proxy listens on 0.0.0.0 and TCP port 14080.
 
 Configuration
 -------------
@@ -151,3 +151,76 @@ rule4="user(.*)":"POST":"(.*)/drawings$":"":""
 rule5="user(.*)":"POST":"(.*)/appliances/(.*)":"":""
 rule6="user(.*)":"DELETE":"":"":""
 ```
+
+Managing projects across gns3-proxy backends
+--------------------------------------------
+
+[gns3_proxy_replicate_projects.py](https://github.com/srieger1/gns3-proxy/blob/develop/gns3_proxy_replicate_projects.py) facilitates the replication of projects across backend servers.
+Command syntax is:
+
+```
+usage: gns3_proxy_replicate_projects.py [-h] [--config-file CONFIG_FILE]
+                                        [--delete-target-project] [--force]
+                                        [--inject-replication-note]
+                                        [--log-level LOG_LEVEL]
+                                        (--project-id PROJECT_ID | --project-name PROJECT_NAME)
+                                        [--regenerate-mac-address REGENERATE_MAC_ADDRESS]
+                                        --source-server SOURCE_SERVER
+                                        --target-server TARGET_SERVER
+```
+
+The provided example [crontab](https://github.com/srieger1/gns3-proxy/blob/develop/gns3_proxy_crontab) contains examples to 
+use gns3_proxy_replicate_projects.py. For example:
+
+```
+gns3_proxy_replicate_projects.py --source gns3-master --target "gns3-(.*)" --project-name "KommProt(.*)" --regenerate-mac-address "02:01:00:(.*)" --force 
+```
+
+will replicate all GNS3 project names beginning with "KommProt" from the backend server gns3-master as the source to
+all backend servers matching the regular expression "gns3-.(.*)". The option --force tells the utility to overwrite existing
+projects with the same name on the targets without further notice. The option --regenerate-mac-address searches for the
+given MAC address in the projects and creates a new locally administered MAC address. This is especially necessary for
+links to cloud node types in the project. Otherwise all projects will use the same address leading to duplicate MAC and
+consequently duplicated IP addresses. 
+
+[gns3_proxy_manage_projects.py](https://github.com/srieger1/gns3-proxy/blob/develop/gns3_proxy_manage_projects.py) facilitates the management of projects on backend servers.
+Command syntax is:
+
+```
+usage: gns3_proxy_manage_projects.py [-h] [--config-file CONFIG_FILE]
+                                     [--force] [--log-level LOG_LEVEL]
+                                     (--project-id PROJECT_ID | --project-name PROJECT_NAME)
+                                     (--export-to-dir EXPORT_TO_DIR | --import-from-file IMPORT_FROM_FILE | --show | --delete | --start | --stop)
+                                     --target-server TARGET_SERVER
+```
+
+The provided example [crontab](https://github.com/srieger1/gns3-proxy/blob/develop/gns3_proxy_crontab) contains examples to 
+use gns3_proxy_manage_projects.py. For example:
+
+```
+gns3_proxy_manage_projects.py --show --project-name "(.*)" --target "(.*)" 
+```
+
+will show the status of all projects on all backend server.
+
+```
+gns3_proxy_manage_projects.py --start --project-name TestProject --target gns3-1 
+```
+
+will start the project with the name TestProject on the server gns3-1 defined as a backend in gns3_proxy_config.ini.
+Can be used, e.g., together with cron to start the project ahead of time for lab sessions or courses, avoiding
+waiting for projects to be ready for use when students take the lab.
+
+```
+gns3_proxy_manage_projects.py --export-to-dir . --project-name TestProject --target gns3-1 
+```
+
+will export the project TestProject from gns3-1 to a ZIP file that can be used as a backup, e.g. to import later using
+GNS3 GUI, or --import-from-file option, like:
+
+```
+gns3_proxy_manage_projects.py --import-from-file project.zip --project-id f1d1e2b8-c41f-42cf-97d4-513f3fd01cd2 --target gns3-1 
+```
+
+will import GNS3 project exported in file project.zip to backend server gns3-1. The specified project-id (must be a valid UUID v4
+in GNS3) will be used for the import.
