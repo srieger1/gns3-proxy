@@ -32,6 +32,7 @@ from collections import namedtuple
 
 import configparser
 import re
+import time
 from ipaddress import ip_address
 
 if os.name != 'nt':
@@ -419,6 +420,11 @@ class Connection(object):
             return None
 
     def close(self):
+        # GNS3 proxy needs a clean closing of connections, otherwise, e.g., conn will be closed before
+        # HTTP response is delivered and for example ProxyAuthenticationException will not be displayed
+        #self.conn.close()
+        self.conn.shutdown(socket.SHUT_WR)
+        time.sleep(1)
         self.conn.close()
         self.closed = True
 
@@ -553,7 +559,7 @@ class Proxy(threading.Thread):
                 logger.debug("Received Authorization request %s %s %s" % (auth_request, username, password))
 
                 # Lookup user from request in config
-                if self.config_users[username]:
+                if self.config_users is not None and username in self.config_users:
                     # Check submitted password
                     if self.config_users[username] == password:
                         logger.debug("Successfully authenticated user %s" % username)
@@ -570,27 +576,32 @@ class Proxy(threading.Thread):
                 raise ProxyAuthenticationFailed()
 
             # evaluate denied requests
-            for item in self.config_deny:
-                for key in self.config_users:
-                    if re.fullmatch(item["user"], key):
-                        logger.debug("Deny matched user %s = %s" % (item["user"], key))
-                        access_user = key
-                        logger.debug("Trying to match %s as %s" % (username, access_user))
-                        if username == access_user:
-                            logger.debug(
-                                "User matched mapping %s = %s, evaluating deny rule %s" % (item["user"], key, item))
-                            logger.debug(
-                                "Debug deny rule %s %s" % (text_(self.request.method), text_(self.request.url.path)))
-                            # logger.info("Method: %s %s %s" % ((re.fullmatch(item["method"],text_(self.request.method)),
-                            #   item["method"], text_(self.request.method))))
-                            # logger.info("Path: %s %s %s" % ((re.fullmatch(item["url"],text_(self.request.url.path)),
-                            #   item["url"], text_(self.request.url.path))))
-                            if (((item["method"] == "") or re.fullmatch(item["method"], text_(self.request.method))) and
-                                    (item["url"] == "" or re.fullmatch(item["url"], text_(self.request.url.path))) and
-                                    (item["header"] == "" or re.fullmatch(item["header"], text_(self.request.headers))) and
-                                    (item["body"] == "" or re.fullmatch(item["body"], text_(self.request.body)))):
-                                logger.info("Request denied due to matching rule %s", item)
-                                raise ProxyAuthenticationFailed()
+            if self.config_deny is not None and len(self.config_deny) > 0:
+                for item in self.config_deny:
+                    if self.config_users is not None:
+                        for key in self.config_users:
+                            if re.fullmatch(item["user"], key):
+                                logger.debug("Deny matched user %s = %s" % (item["user"], key))
+                                access_user = key
+                                logger.debug("Trying to match %s as %s" % (username, access_user))
+                                if username == access_user:
+                                    logger.debug(
+                                        "User matched mapping %s = %s, evaluating deny rule %s" % (item["user"], key, item))
+                                    logger.debug(
+                                        "Debug deny rule %s %s" % (text_(self.request.method), text_(self.request.url.path)))
+                                    # logger.info("Method: %s %s %s" % ((re.fullmatch(item["method"],text_(self.request.method)),
+                                    #   item["method"], text_(self.request.method))))
+                                    # logger.info("Path: %s %s %s" % ((re.fullmatch(item["url"],text_(self.request.url.path)),
+                                    #   item["url"], text_(self.request.url.path))))
+                                    if (((item["method"] == "") or re.fullmatch(item["method"], text_(self.request.method))) and
+                                            (item["url"] == "" or re.fullmatch(item["url"], text_(self.request.url.path))) and
+                                            (item["header"] == "" or re.fullmatch(item["header"], text_(self.request.headers))) and
+                                            (item["body"] == "" or re.fullmatch(item["body"], text_(self.request.body)))):
+                                        logger.info("Request denied due to matching rule %s", item)
+                                        raise ProxyAuthenticationFailed()
+                    else:
+                        logger.info("Cannot evaluate deny rules. No users found in config.")
+                        raise ProxyAuthenticationFailed()
 
             # CONNECT not used by GNS3?
             # if self.request.method == b'CONNECT':
@@ -605,24 +616,32 @@ class Proxy(threading.Thread):
             backend_server = None
 
             # Try to find match for user in config
-            if len(self.config_mapping) > 0:
+            if self.config_mapping is not None and len(self.config_mapping) > 0:
                 for item in self.config_mapping:
-                    for key in self.config_users:
-                        if re.fullmatch(item["match"], key):
-                            logger.debug("User mapping matched %s = %s" % (item["match"], key))
-                            access_user = key
-                            logger.debug("Trying to match %s as %s" % (username, access_user))
-                            if username == access_user:
-                                logger.debug("User matched mapping %s = %s, choosing server %s" % (
-                                    item["match"], key, item["server"]))
-                                backend_server = self.config_servers[item["server"]]
-                                break
+                    if self.config_users is not None:
+                        for key in self.config_users:
+                            if re.fullmatch(item["match"], key):
+                                logger.debug("User mapping matched %s = %s" % (item["match"], key))
+                                access_user = key
+                                logger.debug("Trying to match %s as %s" % (username, access_user))
+                                if username == access_user:
+                                    logger.debug("User matched mapping %s = %s, choosing server %s" % (
+                                        item["match"], key, item["server"]))
+                                    if self.config_servers is not None and item["server"] in self.config_servers:
+                                        backend_server = self.config_servers[item["server"]]
+                                    else:
+                                        logger.fatal("Mapped server %s not found in config." % item["server"])
+                                        raise ProxyError()
+                                    break
+                    else:
+                        logger.info("Cannot evaluate mapping rules. No users found in config.")
+                        raise ProxyAuthenticationFailed()
 
             # if no server was chosen by mapping, try using default, otherwise raise exception
             if backend_server is None:
                 if self.default_server is not None:
                     # if a default server is set in config, choose this one by default
-                    if self.default_server in self.config_servers:
+                    if self.config_servers is not None and self.default_server in self.config_servers:
                         backend_server = self.config_servers[self.default_server]
                         logger.debug("Redirecting client %s to default backend server %s:%s" % (
                             self.client.addr[0], backend_server, self.backend_port))
