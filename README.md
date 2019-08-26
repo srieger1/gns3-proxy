@@ -39,6 +39,13 @@ Changes/enhancements to proxy.py:
 - Fixes and tweaks to allow the connection to GNS3 backends, especially keeping connections alive and leaving HTTP headers to support direct passthrough of WebSocket connections
 - Basic access logging/status monitoring support
 
+Further utilities provided to use the proxy:
+- [gns3_proxy_manage_projects.py](https://github.com/srieger1/gns3-proxy/blob/develop/gns3_proxy_manage_projects.py) allows management of projects on backend servers, e.g., bulk import, export,
+  start, stop, delete projects on all or certain backend servers based on regexp.
+- [gns3_proxy_replicate_projects.py](https://github.com/srieger1/gns3-proxy/blob/develop/gns3_proxy_replicate_projects.py) supports replication of projects across backend servers.
+
+gns3_proxy_manage_project.py and gns3_proxy_replicate_projects.py be combined with [cron entry](https://github.com/srieger1/gns3-proxy/blob/develop/gns3_proxy_crontab) to run tasks periodically.   
+
 Concept
 -------
 
@@ -55,9 +62,8 @@ used in our backends and for the GNS3 client GUI. Users defined in the proxy, e.
 together in a group or on individual projects from at home, will be mapped to an individual backend server allowing
 load balancing and failover, since GNS3 compared to other network emulation environments does not offer a cluster setup
 to spread running projects and contained resources. The proxy also allows to filter and hence deny requests that
-contain modifications to projects. Prepared projects are periodically synced to all server backends. 
-[Sample scripts](https://github.com/srieger1/gns3-proxy/tree/develop/scripts/backend-sync-example)
-for the synchronization are provided in this repository. 
+contain modifications to projects. Prepared projects are periodically synced to all server backends using cron and the
+replication utility [gns3_proxy_replicate_projects.py](https://github.com/srieger1/gns3-proxy/blob/develop/gns3_proxy_replicate_projects.py).
 
 Installation
 ------------
