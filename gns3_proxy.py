@@ -11,12 +11,13 @@
     :license: BSD, see LICENSE for more details.
 """
 
-# TODO: modification of requests/responses on-the-fly, e.g., to change advertised GNS3 server version
 # TODO: override server backend for user, e.g., using username@backend as user
+# TODO: modification of requests/responses on-the-fly, e.g., to change advertised GNS3 server version?
 # TODO: add logging/auditing, monitoring of load etc. (current open connections)
-# TODO: detect "console_host": "0.0.0.0" and give warning
-# TODO: web interface for manual replication and start/stop
 # TODO: proxy.py updates esp. multi processing?
+
+# TODO: show proxy errors (e.g., console_host misconfig) explicitly in GNS3 GUI - if possible?
+# TODO: web interface for manual replication and start/stop
 # TODO: add reservation system/ldap integration?
 
 import argparse
@@ -38,11 +39,9 @@ from ipaddress import ip_address
 if os.name != 'nt':
     import resource
 
-
 # Default arguments
 DEFAULT_CONFIG_FILE = 'gns3_proxy_config.ini'
 DEFAULT_LOG_LEVEL = 'INFO'
-
 
 VERSION = (0, 4)
 __version__ = '.'.join(map(str, VERSION[0:2]))
@@ -422,7 +421,7 @@ class Connection(object):
     def close(self):
         # GNS3 proxy needs a clean closing of connections, otherwise, e.g., conn will be closed before
         # HTTP response is delivered and for example ProxyAuthenticationException will not be displayed
-        #self.conn.close()
+        # self.conn.close()
         self.conn.shutdown(socket.SHUT_WR)
         time.sleep(1)
         self.conn.close()
@@ -586,17 +585,23 @@ class Proxy(threading.Thread):
                                 logger.debug("Trying to match %s as %s" % (username, access_user))
                                 if username == access_user:
                                     logger.debug(
-                                        "User matched mapping %s = %s, evaluating deny rule %s" % (item["user"], key, item))
+                                        "User matched mapping %s = %s, evaluating deny rule %s" % (
+                                        item["user"], key, item))
                                     logger.debug(
-                                        "Debug deny rule %s %s" % (text_(self.request.method), text_(self.request.url.path)))
+                                        "Debug deny rule %s %s" % (
+                                        text_(self.request.method), text_(self.request.url.path)))
                                     # logger.info("Method: %s %s %s" % ((re.fullmatch(item["method"],text_(self.request.method)),
                                     #   item["method"], text_(self.request.method))))
                                     # logger.info("Path: %s %s %s" % ((re.fullmatch(item["url"],text_(self.request.url.path)),
                                     #   item["url"], text_(self.request.url.path))))
-                                    if (((item["method"] == "") or re.fullmatch(item["method"], text_(self.request.method))) and
-                                            (item["url"] == "" or re.fullmatch(item["url"], text_(self.request.url.path))) and
-                                            (item["header"] == "" or re.fullmatch(item["header"], text_(self.request.headers))) and
-                                            (item["body"] == "" or re.fullmatch(item["body"], text_(self.request.body)))):
+                                    if (((item["method"] == "") or re.fullmatch(item["method"],
+                                                                                text_(self.request.method))) and
+                                            (item["url"] == "" or re.fullmatch(item["url"],
+                                                                               text_(self.request.url.path))) and
+                                            (item["header"] == "" or re.fullmatch(item["header"],
+                                                                                  text_(self.request.headers))) and
+                                            (item["body"] == "" or re.fullmatch(item["body"],
+                                                                                text_(self.request.body)))):
                                         logger.info("Request denied due to matching rule %s", item)
                                         raise ProxyAuthenticationFailed()
                     else:
@@ -692,6 +697,20 @@ class Proxy(threading.Thread):
         # only for non-https requests
         if not self.request.method == b'CONNECT':
             self.response.parse(data)
+
+            if b'x-route' in self.response.headers:
+                if self.response.headers[b'x-route'][1].lower() == b'/v2/projects/{project_id}/nodes':
+                    logger.info("%s", self.response.headers[b'x-route'])
+                    if data.find(b"\"console_host\": \"0.0.0.0\",") != -1:
+                        logger.fatal("Backend %s is likely to be misconfigured! In gns3_server.conf host needs to be"
+                                     "changed to the primary IP address also used in the backend config. Seems to be"
+                                     "host = 0.0.0.0. Console connections to nodes on this backend will not work"
+                                     "when accessed through the proxy! See also gns3_proxy setup documentation."
+                                     % str(self.server.addr))
+                        raise ProxyError()
+                    # data = data.replace(b"\"console_host\": \"0.0.0.0\",", b"\"console_host\": \"192.168.76.205\",")
+                    # data = data.replace(b"\"console_host\": \"0.0.0.0\",", b"\"console_host\": \"0.0.0.0\",")
+                    # logger.info("%s", data)
 
             # GNS3 Proxy Example to rewrite response content
             #
