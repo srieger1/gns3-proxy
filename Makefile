@@ -2,7 +2,7 @@ SHELL := /bin/bash
 
 NS ?= flex
 IMAGE_NAME ?= gns3-proxy
-VERSION ?= v0.4
+VERSION ?= v0.5
 LATEST_TAG := $(NS)/$(IMAGE_NAME):latest
 IMAGE_TAG := $(NS)/$(IMAGE_NAME):$(VERSION)
 
