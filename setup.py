@@ -47,6 +47,7 @@ setup(
     url=gns3_proxy.__homepage__,
     description=gns3_proxy.__description__,
     long_description=open('README.md').read().strip(),
+    long_description_content_type='text/markdown',
     download_url=gns3_proxy.__download_url__,
     classifiers=classifiers,
     license=gns3_proxy.__license__,
