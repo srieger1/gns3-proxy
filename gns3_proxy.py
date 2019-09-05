@@ -12,14 +12,20 @@
 """
 
 # TODO: override server backend for user, e.g., using username@backend as user
-# TODO: modification of requests/responses on-the-fly, e.g., to change advertised GNS3 server version?
+# TODO: modification of requests/responses on-the-fly, e.g., to change advertised GNS3 server version?,
+#       or display only certain projects for each user
 # TODO: add logging/auditing, monitoring of load etc. (current open connections)
-# TODO: proxy.py updates esp. multi processing?
+# TODO: integrate proxy.py updates, e.g., multi processing?
 # TODO: code refactoring/removing unused proxy.py code
 
-# TODO: show proxy errors (e.g., console_host misconfig) explicitly in GNS3 GUI - if possible?
+# TODO: show proxy errors (e.g., console_host misconfiguration) explicitly in GNS3 GUI - if possible?
 # TODO: web interface for manual replication and start/stop
-# TODO: add reservation system/ldap integration?
+# TODO: reservation system? Allowing certain users to access server backends or projects in specific timeframes
+# TODO: exam environment? Look down access to certain projects and export current state?
+
+# TODO: LDAP integration for user login? Would require SSL connection to server which was dropped for GNS3 2.x, if
+#       we tackle this, also authentication for console access could be addressed (e.g., using websockify instead of
+#       telnet, using Auth or Token as in VIRL)
 
 import argparse
 import os
