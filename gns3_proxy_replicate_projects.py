@@ -3,15 +3,13 @@
 """
     gns3_proxy_replicate_projects
 
-    GNS3 Proxy Project Replication
-
-    gns3_proxy.py is based on proxy.py - HTTP Proxy Server in Python - copyright: (c) 2013-2018 by Abhinav Singh
+    Replication of GNS3 projects across multiple backend nodes, e.g., behind a GNS3 proxy
 
     :copyright: (c) 2019 by Sebastian Rieger.
     :license: BSD, see LICENSE for more details.
 """
 
-# TODO: replicate images/appliances? symbols/templages etc.?
+# TODO: replicate images/appliances? symbols/templates etc.?
 
 import argparse
 import configparser
@@ -34,13 +32,6 @@ __author_email__ = 'sebastian@riegers.de'
 __homepage__ = 'https://github.com/srieger1/gns3-proxy'
 __download_url__ = '%s/archive/master.zip' % __homepage__
 __license__ = 'BSD'
-# __version__ = '.'.join(map(str, VERSION[0:2]))
-# __description__ = 'Lightweight HTTP, HTTPS, WebSockets Proxy Server in a single Python file'
-# __author__ = 'Abhinav Singh'
-# __author_email__ = 'mailsforabhinav@gmail.com'
-# __homepage__ = 'https://github.com/abhinavsingh/proxy.py'
-# __download_url__ = '%s/archive/master.zip' % __homepage__
-# __license__ = 'BSD'
 
 logger = logging.getLogger(__name__)
 

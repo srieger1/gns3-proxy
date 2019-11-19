@@ -14,3 +14,4 @@ proxy.py.iml
 gns3_proxy.egg-info
 gns3_proxy.iml
 gns3_proxy_config_hsfd.ini
+gns3_proxy_config_local-test.ini

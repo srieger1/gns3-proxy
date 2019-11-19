@@ -3,9 +3,7 @@
 """
     gns3_proxy_manage_projects
 
-    GNS3 Proxy Project Replication
-
-    gns3_proxy.py is based on proxy.py - HTTP Proxy Server in Python - copyright: (c) 2013-2018 by Abhinav Singh
+    Management of GNS3 projects across multiple backend nodes, e.g., behind a GNS3 proxy
 
     :copyright: (c) 2019 by Sebastian Rieger.
     :license: BSD, see LICENSE for more details.
@@ -33,13 +31,6 @@ __author_email__ = 'sebastian@riegers.de'
 __homepage__ = 'https://github.com/srieger1/gns3-proxy'
 __download_url__ = '%s/archive/master.zip' % __homepage__
 __license__ = 'BSD'
-# __version__ = '.'.join(map(str, VERSION[0:2]))
-# __description__ = 'Lightweight HTTP, HTTPS, WebSockets Proxy Server in a single Python file'
-# __author__ = 'Abhinav Singh'
-# __author_email__ = 'mailsforabhinav@gmail.com'
-# __homepage__ = 'https://github.com/abhinavsingh/proxy.py'
-# __download_url__ = '%s/archive/master.zip' % __homepage__
-# __license__ = 'BSD'
 
 logger = logging.getLogger(__name__)
 
@@ -71,7 +62,7 @@ class ProxyError(Exception):
 
 def parse_args(args):
     parser = argparse.ArgumentParser(
-        description='gns3_proxy_manage_projects.py v%s Replicate project to GNS3 proxy backends.' % __version__,
+        description='gns3_proxy_manage_projects.py v%s Manage projects on GNS3 proxy backends.' % __version__,
         epilog='gns3_proxy not working? Report at: %s/issues/new' % __homepage__
     )
     # Argument names are ordered alphabetically.
@@ -103,7 +94,7 @@ def parse_args(args):
     action_group.add_argument('--stop', action='store_true', default=DEFAULT_STOP_ACTION,
                               help='Start projects.')
     parser.add_argument('--target-server', type=str, required=True,
-                        help='Target(s) to copy project to. Name of a servers/backends defined in the config file. '
+                        help='Target(s) to manage projects on. Name of a servers/backends defined in the config file. '
                              'Can be specified as a regular expression to match multiple target servers.')
 
     return parser.parse_args(args)
@@ -192,7 +183,7 @@ def main():
                                 project_uuid = str(uuid.UUID(args.project_id, version=4))
                             except ValueError:
                                 logger.fatal("Provided project-id %s is not a valid UUID4 (like, e.g., "
-                                             "f1d1e2b8-c41f-42cf-97d4-513f3fd01cd2).")
+                                             "f1d1e2b8-c41f-42cf-97d4-513f3fd01cd2)." % args.project_id)
                                 raise ProxyError()
 
                         logger.debug("Checking if target project exists...")
