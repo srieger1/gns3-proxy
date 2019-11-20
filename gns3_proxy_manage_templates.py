@@ -64,16 +64,19 @@ def parse_args(args):
     # Argument names are ordered alphabetically.
     parser.add_argument('--config-file', type=str, default=DEFAULT_CONFIG_FILE,
                         help='Location of the gns3_proxy config file. Default: gns3_proxy_config.ini.')
-    parser.add_argument('--force', action='store_true', default=DEFAULT_FORCE,
-                        help='Force action without further prompt. E.g., delete templates without further '
-                             'verification.')
     parser.add_argument('--log-level', type=str, default=DEFAULT_LOG_LEVEL,
                         help='Valid options: DEBUG, INFO (default), WARNING, ERROR, CRITICAL. '
                              'Both upper and lowercase values are allowed.'
                              'You may also simply use the leading character e.g. --log-level d')
+
+    parser.add_argument('--force', action='store_true', default=DEFAULT_FORCE,
+                        help='Force action without further prompt. E.g., delete templates without further '
+                             'verification.')
+
     parser.add_argument('--template-name', type=str, required=True,
                         help='Name of the template to be managed.'
                              'Can be specified as a regular expression to match multiple templates.')
+
     action_group = parser.add_mutually_exclusive_group(required=True)
     action_group.add_argument('--export-to-dir', type=str,
                               help='Export template to directory.')
@@ -83,6 +86,7 @@ def parse_args(args):
                               help='Delete templates.')
     action_group.add_argument('--show', action='store_true', default=DEFAULT_SHOW_ACTION,
                               help='Show templates and their status.')
+
     parser.add_argument('--target-server', type=str, required=True,
                         help='Target(s) to copy project to. Name of a servers/backends defined in the config file. '
                              'Can be specified as a regular expression to match multiple target servers.')

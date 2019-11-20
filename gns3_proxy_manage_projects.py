@@ -68,18 +68,21 @@ def parse_args(args):
     # Argument names are ordered alphabetically.
     parser.add_argument('--config-file', type=str, default=DEFAULT_CONFIG_FILE,
                         help='Location of the gns3_proxy config file. Default: gns3_proxy_config.ini.')
-    parser.add_argument('--force', action='store_true', default=DEFAULT_FORCE,
-                        help='Force action without further prompt. E.g., delete projects without further verification.')
     parser.add_argument('--log-level', type=str, default=DEFAULT_LOG_LEVEL,
                         help='Valid options: DEBUG, INFO (default), WARNING, ERROR, CRITICAL. '
                              'Both upper and lowercase values are allowed.'
                              'You may also simply use the leading character e.g. --log-level d')
+
+    parser.add_argument('--force', action='store_true', default=DEFAULT_FORCE,
+                        help='Force action without further prompt. E.g., delete projects without further verification.')
+
     project_group = parser.add_mutually_exclusive_group(required=True)
     project_group.add_argument('--project-id', type=str,
                                help='Project UUID to copy. During import used as the UUID for the new project.')
     project_group.add_argument('--project-name', type=str,
                                help='Project name to copy. Can be specified as a regular expression to match '
                                     'multiple projects.')
+
     action_group = parser.add_mutually_exclusive_group(required=True)
     action_group.add_argument('--export-to-dir', type=str,
                               help='Export projects to directory.')
@@ -93,6 +96,7 @@ def parse_args(args):
                               help='Start projects.')
     action_group.add_argument('--stop', action='store_true', default=DEFAULT_STOP_ACTION,
                               help='Start projects.')
+
     parser.add_argument('--target-server', type=str, required=True,
                         help='Target(s) to manage projects on. Name of a servers/backends defined in the config file. '
                              'Can be specified as a regular expression to match multiple target servers.')

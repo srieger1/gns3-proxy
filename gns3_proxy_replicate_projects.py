@@ -67,29 +67,33 @@ def parse_args(args):
     # Argument names are ordered alphabetically.
     parser.add_argument('--config-file', type=str, default=DEFAULT_CONFIG_FILE,
                         help='Location of the gns3_proxy config file. Default: gns3_proxy_config.ini.')
+    parser.add_argument('--log-level', type=str, default=DEFAULT_LOG_LEVEL,
+                        help='Valid options: DEBUG, INFO (default), WARNING, ERROR, CRITICAL. '
+                             'Both upper and lowercase values are allowed.'
+                             'You may also simply use the leading character e.g. --log-level d')
+
     parser.add_argument('--delete-target-project', action='store_true', default=DEFAULT_DELETE_TARGET_PROJECT,
                         help='Whether to delete target project before import.'
                              'By default project will not be deleted on target server, if it already exists.')
     parser.add_argument('--force', action='store_true', default=DEFAULT_FORCE,
                         help='Force action without further prompt. E.g., overwrite or delete existing projects '
                              'without further verification.')
-    parser.add_argument('--inject-replication-note', action='store_true', default=DEFAULT_INJECT_REPLICATION_NOTE,
-                        help='Whether to inject a note containing the target server name and additional replication'
-                             'details in the target project.')
-    parser.add_argument('--log-level', type=str, default=DEFAULT_LOG_LEVEL,
-                        help='Valid options: DEBUG, INFO (default), WARNING, ERROR, CRITICAL. '
-                             'Both upper and lowercase values are allowed.'
-                             'You may also simply use the leading character e.g. --log-level d')
+
     project_group = parser.add_mutually_exclusive_group(required=True)
     project_group.add_argument('--project-id', type=str,
                                help='Project UUID to copy.')
     project_group.add_argument('--project-name', type=str,
                                help='Project name to copy. Can be specified as a regular expression to match '
                                     'multiple projects.')
+
+    parser.add_argument('--inject-replication-note', action='store_true', default=DEFAULT_INJECT_REPLICATION_NOTE,
+                        help='Whether to inject a note containing the target server name and additional replication'
+                             'details in the target project.')
     parser.add_argument('--regenerate-mac-address', type=str,
                         help='Specify a mac address that should be regenerated in the replicated target project. '
                              'This is, e.g., necessary for interfaces using DHCP to an external network, i.e., '
                              'cloud nodes in GNS3, to avoid MAC and IP address conflicts.')
+
     parser.add_argument('--source-server', type=str, required=True,
                         help='Source server to copy project from. A name of a server/backend defined in the '
                              'config file.')

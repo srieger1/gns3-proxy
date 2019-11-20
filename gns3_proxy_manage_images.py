@@ -21,8 +21,6 @@ from ipaddress import ip_address
 
 import requests
 
-# TODO: download of image (export) does not work
-
 VERSION = (0, 1)
 __version__ = '.'.join(map(str, VERSION[0:2]))
 __description__ = 'GNS3 Proxy Manage Images'
@@ -52,6 +50,12 @@ DEFAULT_LOG_LEVEL = 'INFO'
 DEFAULT_SHOW_ACTION = False
 DEFAULT_FORCE = False
 
+# Compute Image Backend
+IMAGE_BACKEND_URL = '/compute/qemu/images'
+
+# Alternate location for image access, used for upload by the GNS3 client, but download (GET) throws an error
+ALT_IMAGE_BACKEND_URL = '/computes/local/qemu/images'
+
 
 class ProxyError(Exception):
     pass
@@ -65,16 +69,19 @@ def parse_args(args):
     # Argument names are ordered alphabetically.
     parser.add_argument('--config-file', type=str, default=DEFAULT_CONFIG_FILE,
                         help='Location of the gns3_proxy config file. Default: gns3_proxy_config.ini.')
-    parser.add_argument('--force', action='store_true', default=DEFAULT_FORCE,
-                        help='Force action without further prompt. E.g., delete images without further '
-                             'verification.')
     parser.add_argument('--log-level', type=str, default=DEFAULT_LOG_LEVEL,
                         help='Valid options: DEBUG, INFO (default), WARNING, ERROR, CRITICAL. '
                              'Both upper and lowercase values are allowed.'
                              'You may also simply use the leading character e.g. --log-level d')
+
+    parser.add_argument('--force', action='store_true', default=DEFAULT_FORCE,
+                        help='Force action without further prompt. E.g., delete images without further '
+                             'verification.')
+
     parser.add_argument('--image-filename', type=str, required=True,
                         help='Name of the image to be managed.'
                              'Can be specified as a regular expression to match multiple images.')
+
     action_group = parser.add_mutually_exclusive_group(required=True)
     action_group.add_argument('--export-to-dir', type=str,
                               help='Export image to directory.')
@@ -87,6 +94,7 @@ def parse_args(args):
     #                          help='Delete images.')
     action_group.add_argument('--show', action='store_true', default=DEFAULT_SHOW_ACTION,
                               help='Show images and their status.')
+
     parser.add_argument('--target-server', type=str, required=True,
                         help='Target(s) to copy project to. Name of a servers/backends defined in the config file. '
                              'Can be specified as a regular expression to match multiple target servers.')
@@ -171,7 +179,7 @@ def main():
                         print("#### Showing images on server: %s" % server)
 
                         logger.debug("Getting status of images...")
-                        url = base_dst_api_url + '/computes/local/qemu/images'
+                        url = base_dst_api_url + IMAGE_BACKEND_URL
                         r = requests.get(url, auth=(username, password))
                         if r.status_code == 200:
                             image_results = json.loads(r.text)
@@ -186,10 +194,9 @@ def main():
                         print("#### Exporting image %s on server: %s" % (args.image_filename, server))
 
                         logger.debug("Getting images from target server...")
-                        url = base_dst_api_url + '/computes/local/qemu/images'
+                        url = base_dst_api_url + IMAGE_BACKEND_URL
                         r = requests.get(url, auth=(username, password))
                         if r.status_code == 200:
-                            image_exists = False
                             image_results = json.loads(r.text)
                             for image in image_results:
                                 if re.fullmatch(args.image_filename, image['filename']):
@@ -197,10 +204,10 @@ def main():
                                                  % (image['filename'], server))
 
                                     filename = str(server) + "_" + time.strftime("%Y%m%d-%H%M%S") + image['filename']
-                                    url = base_dst_api_url + '/computes/local/qemu/images/' + image['filename']
+                                    url = base_dst_api_url + IMAGE_BACKEND_URL + '/' + image['filename']
                                     r = requests.get(url, auth=(username, password), stream=True)
                                     with open(os.path.join(args.export_to_dir, filename), 'wb') as outfile:
-                                        for chunk in r.iter_content(chunk_size=1024*1024):
+                                        for chunk in r.iter_content(chunk_size=1024 * 1024):
                                             if chunk:
                                                 outfile.write(chunk)
 
@@ -216,15 +223,16 @@ def main():
                         print("#### Importing image %s on server: %s" % (args.image_filename, server))
 
                         logger.debug("Checking if target image exists...")
-                        url = base_dst_api_url + '/computes/local/qemu/images'
+                        url = base_dst_api_url + IMAGE_BACKEND_URL
                         r = requests.get(url, auth=(username, password))
                         if r.status_code == 200:
                             image_exists = False
+                            image_to_delete = ''
                             image_results = json.loads(r.text)
                             for image in image_results:
                                 if re.fullmatch(args.image_filename, image['filename']):
                                     logger.debug("image: %s already exists on server %s"
-                                                 % (image, server))
+                                                 % (image['filename'], server))
                                     if image_exists:
                                         logger.fatal(
                                             "Multiple images matched %s on server %s. "
@@ -234,18 +242,34 @@ def main():
                                         raise ProxyError()
                                     else:
                                         image_exists = True
+                                        image_to_delete = image['filename']
 
                             if image_exists:
-                                if not args.force:
+                                if args.force:
+                                    # deleting image
+                                    # print("Deleting existing image %s on server: %s"
+                                    #      % (image_to_delete, config_servers[server]))
+                                    # url = base_dst_api_url + IMAGE_BACKEND_URL + '/' + image_to_delete
+                                    # r = requests.delete(url, auth=(username, password))
+                                    # if not r.status_code == 204:
+                                    #    if r.status_code == 404:
+                                    #        logger.debug("Image did not exist before, not deleted")
+                                    #    else:
+                                    #        logger.fatal("unable to delete image")
+                                    #        raise ProxyError()
+                                    logger.debug(
+                                        "image: %s (%s) already exists on server %s. Overwriting it."
+                                        % (args.image_filename, image_to_delete, server))
+                                else:
                                     logger.fatal(
-                                        "image: %s already exists on server %s. Use --force to overwrite it"
+                                        "image: %s (%s) already exists on server %s. Use --force to overwrite it"
                                         " during import."
-                                        % (args.image_filename, server))
+                                        % (args.image_filename, image_to_delete, server))
                                     raise ProxyError()
 
                             logger.debug("Importing image")
                             # import image
-                            url = base_dst_api_url + '/computes/local/qemu/images/' + args.image_filename
+                            url = base_dst_api_url + ALT_IMAGE_BACKEND_URL + '/' + args.image_filename
                             files = {'file': open(args.import_from_file, 'rb')}
                             r = requests.post(url, files=files, auth=(username, password))
                             if not r.status_code == 200:
