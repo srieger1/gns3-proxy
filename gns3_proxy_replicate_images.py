@@ -16,9 +16,7 @@ import logging
 import re
 import shutil
 import sys
-import os
 import tempfile
-import time
 from ipaddress import ip_address
 
 import requests
@@ -239,13 +237,13 @@ def main():
                     for target_image in target_image_results:
                         if re.fullmatch(image_filename, target_image['filename']):
                             logger.debug("image: %s already exists on server %s"
-                                         % (target_image['filename'], server))
+                                         % (target_image['filename'], target_server_address))
                             if target_image_exists:
                                 logger.fatal(
                                     "Multiple images matched %s on server %s. "
                                     "Import can only be used for single image." % (
                                         image_filename, config_servers[
-                                            server]))
+                                            target_server_address]))
                                 raise ProxyError()
                             else:
                                 target_image_exists = True
@@ -266,12 +264,12 @@ def main():
                             #        raise ProxyError()
                             logger.debug(
                                 "image: %s (%s) already exists on server %s. Overwriting it."
-                                % (image_filename, target_image_to_delete, server))
+                                % (image_filename, target_image_to_delete, target_server_address))
                         else:
                             logger.fatal(
                                 "image: %s (%s) already exists on server %s. Use --force to overwrite it"
                                 " during import."
-                                % (image_filename, target_image_to_delete, server))
+                                % (image_filename, target_image_to_delete, target_server_address))
                             raise ProxyError()
 
                     logger.debug("Importing image")
@@ -289,9 +287,9 @@ def main():
                             raise ProxyError()
                     else:
                         print("    #### image %s replicated from server: %s to server: %s"
-                              % (image_filename, src_server, server))
+                              % (image_filename, src_server, target_server_address))
                 else:
-                    logger.fatal("Could not get status of images from server %s." % config_servers[server])
+                    logger.fatal("Could not get status of images from server %s." % config_servers[target_server_address])
                     raise ProxyError()
 
             # image is replicated close temp file

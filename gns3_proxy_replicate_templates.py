@@ -14,11 +14,7 @@ import configparser
 import json
 import logging
 import re
-import shutil
 import sys
-import os
-import tempfile
-import time
 from ipaddress import ip_address
 
 import requests
@@ -220,13 +216,13 @@ def main():
                     for target_template in target_template_results:
                         if re.fullmatch(template_name, target_template['name']):
                             logger.debug("Template: %s already exists on server %s"
-                                         % (target_template['name'], server))
+                                         % (target_template['name'], target_server_address))
                             if target_template_exists:
                                 logger.fatal(
                                     "Multiple templates matched %s on server %s. "
                                     "Import can only be used for single template." % (
                                         template_name, config_servers[
-                                            server]))
+                                            target_server_address]))
                                 raise ProxyError()
                             else:
                                 target_template_to_delete = target_template
@@ -234,10 +230,10 @@ def main():
                     if target_template_exists:
                         if args.force:
                             print("#### Forcing deletion of template %s on server: %s" % (
-                                target_template_to_delete['name'], server))
+                                target_template_to_delete['name'], target_server_address))
 
                             logger.debug("Deleting template %s on server: %s"
-                                         % (target_template_to_delete['name'], config_servers[server]))
+                                         % (target_template_to_delete['name'], config_servers[target_server_address]))
                             r = requests.delete(
                                 base_dst_api_url + '/templates/' + target_template_to_delete['template_id'],
                                 auth=(username, password))
@@ -249,12 +245,12 @@ def main():
                                     raise ProxyError()
                             else:
                                 print("#### Deleted template %s on server: %s"
-                                      % (target_template_to_delete['name'], config_servers[server]))
+                                      % (target_template_to_delete['name'], config_servers[target_server_address]))
                         else:
                             logger.fatal(
                                 "Template: %s already exists on server %s. Use --force to overwrite it"
                                 " during import."
-                                % (target_template_to_delete['name'], server))
+                                % (target_template_to_delete['name'], target_server_address))
                             raise ProxyError()
 
                     logger.debug("Importing template")
@@ -272,10 +268,10 @@ def main():
                             raise ProxyError()
                     else:
                         print("#### Template %s replicated from server: %s to server: %s"
-                              % (template_name, src_server, server))
+                              % (template_name, src_server, target_server_address))
 
                 else:
-                    logger.fatal("Could not get status of templates from server %s." % config_servers[server])
+                    logger.fatal("Could not get status of templates from server %s." % config_servers[target_server_address])
                     raise ProxyError()
 
         print("Done.")

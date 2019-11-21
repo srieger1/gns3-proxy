@@ -252,6 +252,7 @@ def main():
                         if r.status_code == 200:
                             template_exists = False
                             template_results = json.loads(r.text)
+                            template = None
                             for template in template_results:
                                 if re.fullmatch(args.template_name, template['name']):
                                     logger.debug("Template: %s already exists on server %s"
