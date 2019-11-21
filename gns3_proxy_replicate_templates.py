@@ -3,7 +3,7 @@
 """
     gns3_proxy_manage_images
 
-    Replication of GNS3 images across multiple backend nodes, e.g., behind a GNS3 proxy
+    Replication of GNS3 templates across multiple backend nodes, e.g., behind a GNS3 proxy
 
     :copyright: (c) 2019 by Sebastian Rieger.
     :license: BSD, see LICENSE for more details.
@@ -25,7 +25,7 @@ import requests
 
 VERSION = (0, 1)
 __version__ = '.'.join(map(str, VERSION[0:2]))
-__description__ = 'GNS3 Proxy Replicate Images'
+__description__ = 'GNS3 Proxy Replicate Templates'
 __author__ = 'Sebastian Rieger'
 __author_email__ = 'sebastian@riegers.de'
 __homepage__ = 'https://github.com/srieger1/gns3-proxy'
@@ -51,12 +51,6 @@ DEFAULT_CONFIG_FILE = 'gns3_proxy_config.ini'
 DEFAULT_LOG_LEVEL = 'INFO'
 DEFAULT_FORCE = False
 
-# Compute Image Backend
-IMAGE_BACKEND_URL = '/compute/qemu/images'
-
-# Alternate location for image access, used for upload by the GNS3 client, but download (GET) throws an error
-ALT_IMAGE_BACKEND_URL = '/computes/local/qemu/images'
-
 
 class ProxyError(Exception):
     pass
@@ -64,7 +58,7 @@ class ProxyError(Exception):
 
 def parse_args(args):
     parser = argparse.ArgumentParser(
-        description='gns3_proxy_replicate_images.py v%s Replicates images on GNS3 proxy backends.' % __version__,
+        description='gns3_proxy_replicate_templates.py v%s Replicates templates on GNS3 proxy backends.' % __version__,
         epilog='gns3_proxy not working? Report at: %s/issues/new' % __homepage__
     )
     # Argument names are ordered alphabetically.
@@ -76,18 +70,18 @@ def parse_args(args):
                              'You may also simply use the leading character e.g. --log-level d')
 
     parser.add_argument('--force', action='store_true', default=DEFAULT_FORCE,
-                        help='Force action without further prompt. E.g., delete images without further '
+                        help='Force action without further prompt. E.g., delete templates without further '
                              'verification.')
 
-    parser.add_argument('--image-filename', type=str, required=True,
+    parser.add_argument('--template-name', type=str, required=True,
                         help='Name of the image to be replicated.'
-                             'Can be specified as a regular expression to match multiple images.')
+                             'Can be specified as a regular expression to match multiple templates.')
 
     parser.add_argument('--source-server', type=str, required=True,
-                        help='Source server to copy images from. A name of a server/backend defined in the '
+                        help='Source server to copy templates from. A name of a server/backend defined in the '
                              'config file.')
     parser.add_argument('--target-server', type=str, required=True,
-                        help='Target(s) to copy images to. Name of a servers/backends defined in the config file. '
+                        help='Target(s) to copy templates to. Name of a servers/backends defined in the config file. '
                              'Can be specified as a regular expression to match multiple target servers.')
 
     return parser.parse_args(args)
@@ -165,41 +159,28 @@ def main():
             raise ProxyError()
 
         base_src_api_url = "http://" + src_server + ":" + str(backend_port) + "/v2"
-        logger.debug("Searching source images")
-        images = list()
-        url = base_src_api_url + IMAGE_BACKEND_URL
+        logger.debug("Searching source templates")
+        templates = list()
+        url = base_src_api_url + '/templates'
 
         r = requests.get(url, auth=(username, password))
         if not r.status_code == 200:
-            logger.fatal("Could not list images.")
+            logger.fatal("Could not list templates.")
             raise ProxyError()
         else:
-            image_results = json.loads(r.text)
-            for image in image_results:
-                if re.fullmatch(args.image_filename, image['filename']):
-                    logger.debug('matched image: %s' % image['filename'])
-                    images.append(image)
+            template_results = json.loads(r.text)
+            for template in template_results:
+                if re.fullmatch(args.template_name, template['name']):
+                    logger.debug('matched image: %s' % template['name'])
+                    templates.append(template)
 
-        if len(images) == 0:
-            logger.fatal("Specified image not found.")
+        if len(templates) == 0:
+            logger.fatal("Specified template not found.")
             raise ProxyError()
 
-        for image in images:
-            image_filename = image['filename']
-            print("#### Replicating image: %s" % image_filename)
-            tmp_file = tempfile.TemporaryFile()
-
-            # export source image
-            logger.debug("Exporting source image")
-            url = base_src_api_url + IMAGE_BACKEND_URL + '/' + image_filename
-            r = requests.get(url, stream=True, auth=(username, password))
-            if r.status_code == 200:
-                r.raw.decode_content = True
-                shutil.copyfileobj(r.raw, tmp_file)
-                logger.debug("Image exported to file: %s" % tmp_file.name)
-            else:
-                logger.fatal("Unable to export image from source server.")
-                raise ProxyError()
+        for template in templates:
+            template_name = template['name']
+            print("#### Replicating template: %s" % template_name)
 
             # target handling
 
@@ -226,76 +207,76 @@ def main():
                 raise ProxyError()
 
             for target_server_address in target_server_addresses:
-                logger.debug("    #### Replicating image: %s to server: %s" % (image_filename, target_server_address))
+                logger.debug("    #### Replicating template: %s to server: %s" % (template_name, target_server_address))
                 base_dst_api_url = "http://" + target_server_address + ":" + str(backend_port) + "/v2"
 
-                logger.debug("Checking if target image exists...")
-                url = base_dst_api_url + IMAGE_BACKEND_URL
+                logger.debug("Checking if target template exists...")
+                url = base_dst_api_url + '/templates'
                 r = requests.get(url, auth=(username, password))
                 if r.status_code == 200:
-                    target_image_exists = False
-                    target_image_to_delete = ''
-                    target_image_results = json.loads(r.text)
-                    for target_image in target_image_results:
-                        if re.fullmatch(image_filename, target_image['filename']):
-                            logger.debug("image: %s already exists on server %s"
-                                         % (target_image['filename'], server))
-                            if target_image_exists:
+                    target_template_exists = False
+                    target_template_to_delete = None
+                    target_template_results = json.loads(r.text)
+                    for target_template in target_template_results:
+                        if re.fullmatch(template_name, target_template['name']):
+                            logger.debug("Template: %s already exists on server %s"
+                                         % (target_template['name'], server))
+                            if target_template_exists:
                                 logger.fatal(
-                                    "Multiple images matched %s on server %s. "
-                                    "Import can only be used for single image." % (
-                                        image_filename, config_servers[
+                                    "Multiple templates matched %s on server %s. "
+                                    "Import can only be used for single template." % (
+                                        template_name, config_servers[
                                             server]))
                                 raise ProxyError()
                             else:
-                                target_image_exists = True
-                                target_image_to_delete = image['filename']
-
-                    if target_image_exists:
+                                target_template_to_delete = target_template
+                                target_template_exists = True
+                    if target_template_exists:
                         if args.force:
-                            # deleting image
-                            # print("Deleting existing image %s on server: %s"
-                            #      % (image_to_delete, config_servers[server]))
-                            # url = base_dst_api_url + IMAGE_BACKEND_URL + '/' + image_to_delete
-                            # r = requests.delete(url, auth=(username, password))
-                            # if not r.status_code == 204:
-                            #    if r.status_code == 404:
-                            #        logger.debug("Image did not exist before, not deleted")
-                            #    else:
-                            #        logger.fatal("unable to delete image")
-                            #        raise ProxyError()
-                            logger.debug(
-                                "image: %s (%s) already exists on server %s. Overwriting it."
-                                % (image_filename, target_image_to_delete, server))
+                            print("#### Forcing deletion of template %s on server: %s" % (
+                                target_template_to_delete['name'], server))
+
+                            logger.debug("Deleting template %s on server: %s"
+                                         % (target_template_to_delete['name'], config_servers[server]))
+                            r = requests.delete(
+                                base_dst_api_url + '/templates/' + target_template_to_delete['template_id'],
+                                auth=(username, password))
+                            if not r.status_code == 204:
+                                if r.status_code == 404:
+                                    logger.debug("Template did not exist before, not deleted")
+                                else:
+                                    logger.fatal("unable to delete template")
+                                    raise ProxyError()
+                            else:
+                                print("#### Deleted template %s on server: %s"
+                                      % (target_template_to_delete['name'], config_servers[server]))
                         else:
                             logger.fatal(
-                                "image: %s (%s) already exists on server %s. Use --force to overwrite it"
+                                "Template: %s already exists on server %s. Use --force to overwrite it"
                                 " during import."
-                                % (image_filename, target_image_to_delete, server))
+                                % (target_template_to_delete['name'], server))
                             raise ProxyError()
 
-                    logger.debug("Importing image")
-                    # import image
-                    url = base_dst_api_url + ALT_IMAGE_BACKEND_URL + '/' + image_filename
-                    tmp_file.seek(0)
-                    files = {'file': tmp_file}
-                    r = requests.post(url, files=files, auth=(username, password))
-                    if not r.status_code == 200:
+                    logger.debug("Importing template")
+                    # import template
+                    url = base_dst_api_url + '/templates'
+                    headers = {'content-type': 'application/json'}
+                    r = requests.post(url, auth=(username, password),
+                                      data=json.dumps(template, sort_keys=True, indent=4), verify=False, headers=headers)
+                    if not r.status_code == 201:
                         if r.status_code == 403:
-                            logger.fatal("Forbidden to import image on target server.")
+                            logger.fatal("Forbidden to import template on target server.")
                             raise ProxyError()
                         else:
-                            logger.fatal("Unable to import image on target server.")
+                            logger.fatal("Unable to import template on target server.")
                             raise ProxyError()
                     else:
-                        print("    #### image %s replicated from server: %s to server: %s"
-                              % (image_filename, src_server, server))
-                else:
-                    logger.fatal("Could not get status of images from server %s." % config_servers[server])
-                    raise ProxyError()
+                        print("#### Template %s replicated from server: %s to server: %s"
+                              % (template_name, src_server, server))
 
-            # image is replicated close temp file
-            tmp_file.close()
+                else:
+                    logger.fatal("Could not get status of templates from server %s." % config_servers[server])
+                    raise ProxyError()
 
         print("Done.")
 
