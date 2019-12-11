@@ -176,6 +176,12 @@ def main():
 
         for template in templates:
             template_name = template['name']
+
+            # skip builtin templates like Cloud, NAT, VPCS, Ethernet switch, Ethernet hub, Frame Relay switch, ATM switch
+            if template['builtin']:
+                print("#### Skipping builtin template: %s" % template_name)
+                break
+
             print("#### Replicating template: %s" % template_name)
 
             # target handling
@@ -221,8 +227,7 @@ def main():
                                 logger.fatal(
                                     "Multiple templates matched %s on server %s. "
                                     "Import can only be used for single template." % (
-                                        template_name, config_servers[
-                                            target_server_address]))
+                                        template_name, target_server_address))
                                 raise ProxyError()
                             else:
                                 target_template_to_delete = target_template
@@ -233,7 +238,7 @@ def main():
                                 target_template_to_delete['name'], target_server_address))
 
                             logger.debug("Deleting template %s on server: %s"
-                                         % (target_template_to_delete['name'], config_servers[target_server_address]))
+                                         % (target_template_to_delete['name'], target_server_address))
                             r = requests.delete(
                                 base_dst_api_url + '/templates/' + target_template_to_delete['template_id'],
                                 auth=(username, password))
@@ -245,7 +250,7 @@ def main():
                                     raise ProxyError()
                             else:
                                 print("#### Deleted template %s on server: %s"
-                                      % (target_template_to_delete['name'], config_servers[target_server_address]))
+                                      % (target_template_to_delete['name'], target_server_address))
                         else:
                             logger.fatal(
                                 "Template: %s already exists on server %s. Use --force to overwrite it"
@@ -271,7 +276,7 @@ def main():
                               % (template_name, src_server, target_server_address))
 
                 else:
-                    logger.fatal("Could not get status of templates from server %s." % config_servers[target_server_address])
+                    logger.fatal("Could not get status of templates from server %s." % target_server_address)
                     raise ProxyError()
 
         print("Done.")
