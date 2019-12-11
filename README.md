@@ -86,22 +86,6 @@ Also, you can install the gns3-proxy from [PyPI](https://pypi.org/project/gns3-p
 
 `$ pip install gns3-proxy`
 
-Preparing GNS3 server backends
-------------------------------
-
-The only change necessary in the GNS3 server backends, is to edit the regular
-gns3_server.conf (available in the appliance terminal and, e.g., used to
-change username password etc., see also
-[GNS3 server configuration file](https://docs.gns3.com/1f6uXq05vukccKdMCHhdki5MXFhV8vcwuGwiRvXMQvM0/index.html))
-and change the hostname from 0.0.0.0 to the IP address the server should
-listen on, e.g.:
-
-`host = 192.168.1.100`
-
-After you changed the config of the GNS3 backend servers and restarted them, configure gns3_proxy_config.ini based
-on your needs and run gns3_proxy.py. You can then, configure GNS3-GUI to use the proxy as a remote GNS3 server. 
-By default, the proxy listens on 0.0.0.0 and TCP port 14080.
-
 Configuration
 -------------
 
@@ -151,6 +135,51 @@ rule4="user(.*)":"POST":"(.*)/drawings$":"":""
 rule5="user(.*)":"POST":"(.*)/appliances/(.*)":"":""
 rule6="user(.*)":"DELETE":"":"":""
 ```
+
+Installing a new server backend
+-------------------------------
+
+Deploy the GNS3 server appliance as usual. You can find further information regarding the installation of a server
+for multiple clients in the [GNS3 server for multiple clients docu](https://docs.gns3.com/1K_OVfincey0cUw6CP4dWVgs_pBXMdIJ6gdFGjNy8EZQ/index.html).
+Make sure to allow VT-x/AMD-V for the backend server. If configured correctly, "KVM support available: true" should be
+displayed in the menu after starting the server. The server should be configured to use a static IP address. This can 
+be done using the Shell or selecting the option "Network" (Configure network settings) from the GNS3 menu. Configure
+static IP addresses using the template in /etc/netplan/90_gns3vm_static_netcfg.yaml. 
+
+Afterwards you can use "Migrate" from another GNS3 host to migrate setup and images and projects to the new backend.
+
+To configure the backend directly for gns3-proxy, an easier option is to use the provided [setup-backend.sh](https://github.com/srieger1/gns3-proxy/blob/develop/setup-backend.sh)
+script, e.g., by running:
+
+`$ ./setup-new-backend.sh gns3_proxy_config.ini 192.168.229.12`
+
+The first argument should lead to a gns3-proxy config containing backend port, username, password to use. Second
+argument is the the IP address of the new backend to be configured.
+
+You can use [gns3_proxy_replicate_images.py](https://github.com/srieger1/gns3-proxy/blob/develop/gns3_proxy_replicate_images.py)
+and [gns3_proxy_replicate_templates.py](https://github.com/srieger1/gns3-proxy/blob/develop/gns3_proxy_replicate_templates.py) 
+to replicate all templates and images of an existing backend server to new server. These scripts can also be used 
+periodically using cron to replicate images and templates to all gns3-proxy backends.
+
+[gns3_proxy_manage_images.py](https://github.com/srieger1/gns3-proxy/blob/develop/gns3_proxy_manage_images.py) and 
+[gns_proxy_manage_templates.py](https://github.com/srieger1/gns3-proxy/blob/develop/gns_proxy_manage_templates.py) 
+additionally offer im- and export as well as deletion and listing of all images and templates on backend servers.
+
+Manual configuration of GNS3 server backends
+--------------------------------------------
+
+The only change necessary in the GNS3 server backends, is to edit the regular
+gns3_server.conf (available in the appliance terminal and, e.g., used to
+change username password etc., see also
+[GNS3 server configuration file](https://docs.gns3.com/1f6uXq05vukccKdMCHhdki5MXFhV8vcwuGwiRvXMQvM0/index.html))
+and change the hostname from 0.0.0.0 to the IP address the server should
+listen on, e.g.:
+
+`host = 192.168.1.100`
+
+After you changed the config of the GNS3 backend servers and restarted them, configure gns3_proxy_config.ini based
+on your needs and run gns3_proxy.py. You can then, configure GNS3-GUI to use the proxy as a remote GNS3 server. 
+By default, the proxy listens on 0.0.0.0 and TCP port 14080.
 
 Deploying and managing projects on gns3-proxy backends
 ------------------------------------------------------
