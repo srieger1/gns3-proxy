@@ -242,8 +242,7 @@ def main():
                                 logger.fatal(
                                     "Multiple images matched %s on server %s. "
                                     "Import can only be used for single image." % (
-                                        image_filename, config_servers[
-                                            target_server_address]))
+                                        image_filename, target_server_address))
                                 raise ProxyError()
                             else:
                                 target_image_exists = True
@@ -289,7 +288,7 @@ def main():
                         print("    #### image %s replicated from server: %s to server: %s"
                               % (image_filename, src_server, target_server_address))
                 else:
-                    logger.fatal("Could not get status of images from server %s." % config_servers[target_server_address])
+                    logger.fatal("Could not get status of images from server %s." % target_server_address)
                     raise ProxyError()
 
             # image is replicated close temp file
