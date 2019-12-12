@@ -50,7 +50,7 @@ if os.name != 'nt':
 DEFAULT_CONFIG_FILE = 'gns3_proxy_config.ini'
 DEFAULT_LOG_LEVEL = 'INFO'
 
-VERSION = (0, 5)
+VERSION = (0, 6)
 __version__ = '.'.join(map(str, VERSION[0:2]))
 __description__ = 'GNS3 Proxy based on proxy.py by Abhinav Singh (https://github.com/abhinavsingh/proxy.py)'
 __author__ = 'Sebastian Rieger'

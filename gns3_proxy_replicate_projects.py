@@ -24,7 +24,7 @@ import datetime
 import tempfile
 import requests
 
-VERSION = (0, 2)
+VERSION = (0, 3)
 __version__ = '.'.join(map(str, VERSION[0:2]))
 __description__ = 'GNS3 Proxy Replicate Projects'
 __author__ = 'Sebastian Rieger'

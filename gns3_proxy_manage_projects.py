@@ -23,7 +23,7 @@ from ipaddress import ip_address
 
 import requests
 
-VERSION = (0, 1)
+VERSION = (0, 2)
 __version__ = '.'.join(map(str, VERSION[0:2]))
 __description__ = 'GNS3 Proxy Manage Projects'
 __author__ = 'Sebastian Rieger'

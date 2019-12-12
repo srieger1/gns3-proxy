@@ -18,3 +18,11 @@ PATH='/usr/local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bi
 #0 2 * * *     gns3_proxy_replicate_projects.py --source gns3-master --target "gns3-(.*)" --project-name TestProject1 --force
 #0 3 * * *     gns3_proxy_replicate_projects.py --source gns3-master --target "gns3-2" --project-id f1d1e2b8-c41f-42cf-97d4-513f3fd01cd2 --force
 #0 4 * * *     gns3_proxy_replicate_projects.py --source gns3-master --target "gns3-(.*)" --project-name "KommProt(.*)" --regenerate-mac-address "02:01:00:(.*)" --force
+
+### Example for replication of images to gns3 proxy backends
+#0 2 * * *     gns3_proxy_replicate_images.py --source gns3-master --target "gns3-(.*)" --image-filename vEOS --force
+#0 4 * * *     gns3_proxy_replicate_images.py --source gns3-master --target "gns3-(.*)" --image-filename "vEOS(.*)" --force
+
+### Example for replication of templates to gns3 proxy backends
+#0 2 * * *     gns3_proxy_replicate_templates.py --source gns3-master --target "gns3-2" --template-name Arista-vEOS --force
+#0 4 * * *     gns3_proxy_replicate_templates.py --source gns3-master --target "gns3-(.*)" --template-name "(.*)" --force
