@@ -151,7 +151,7 @@ Afterwards you can use "Migrate" from another GNS3 host to migrate setup and ima
 To configure the backend directly for gns3-proxy, an easier option is to use the provided [setup-backend.sh](https://github.com/srieger1/gns3-proxy/blob/develop/setup-backend.sh)
 script, e.g., by running:
 
-`$ ./setup-new-backend.sh gns3_proxy_config.ini 192.168.229.12`
+`$ ./setup-backend.sh gns3_proxy_config.ini 192.168.229.12`
 
 The first argument should lead to a gns3-proxy config containing backend port, username, password to use. Second
 argument is the the IP address of the new backend to be configured.
