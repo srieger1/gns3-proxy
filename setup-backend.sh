@@ -5,6 +5,7 @@
 #
 # changelog:
 # V0.1    initial version
+# V0.2    fixed ssh-copy-id parameter to work with Ubuntu 16.04 (GNS3 2.1) and Ubuntu 18.04 (GNS3 2.2)
 
 # usage
 if [ ! $# -eq 2 ] ; then
@@ -21,6 +22,11 @@ BACKEND_USERNAME=$(cat $GNS3_PROXY_CONFIG_FILE | grep backend_user | cut -d "=" 
 BACKEND_PASSWORD=$(cat $GNS3_PROXY_CONFIG_FILE | grep backend_password | cut -d "=" -f 2)
 BACKEND_PORT=$(cat $GNS3_PROXY_CONFIG_FILE | grep backend_port | cut -d "=" -f 2)
 
+if [ ! -f "config-templates/gns3_server.conf" ]; then
+  echo "ERROR: no config-templates found! Make sure that config-templates/gns3_server.conf from gns3_proxy repository is available in current working directory."
+  exit -1
+fi
+
 if [ ! -f "$HOME/.ssh/id_rsa" ]; then
   echo "Current user has no ssh key. Creating ssh key in ~/.ssh/id_rsa"
   ssh-keygen -q -f $HOME/.ssh/id_rsa -N ""
@@ -28,7 +34,7 @@ fi
 
 echo "Copying ssh pub key to new backend server..."
 echo "User username gns3 to login to the backend server at $BACKEND_IP_ADDRESS, please enter the password of this user on the backend (default: gns3)."
-ssh-copy-id -f gns3@$BACKEND_IP_ADDRESS
+ssh-copy-id gns3@$BACKEND_IP_ADDRESS
 
 # modify and copy gns3_server.conf template
 sed s/"<BACKEND_IP_ADDRESS>"/"$BACKEND_IP_ADDRESS"/g config-templates/gns3_server.conf >config-templates/gns3_server.conf.$BACKEND_IP_ADDRESS
