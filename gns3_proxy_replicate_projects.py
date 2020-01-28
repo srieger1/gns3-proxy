@@ -30,7 +30,7 @@ __description__ = 'GNS3 Proxy Replicate Projects'
 __author__ = 'Sebastian Rieger'
 __author_email__ = 'sebastian@riegers.de'
 __homepage__ = 'https://github.com/srieger1/gns3-proxy'
-__download_url__ = '%s/archive/master.zip' % __homepage__
+__download_url__ = '%s/archive/develop.zip' % __homepage__
 __license__ = 'BSD'
 
 logger = logging.getLogger(__name__)
@@ -216,7 +216,7 @@ def main():
             url = base_src_api_url + '/projects/' + project_uuid + "/close"
             data = "{}"
             r = requests.post(url, data, auth=(username, password))
-            if not r.status_code == 201:
+            if not r.status_code == 201 and not r.status_code == 204:
                 logger.fatal("Unable to close source project. Source project does not exist or is corrupted?")
                 raise ProxyError()
 
@@ -277,7 +277,7 @@ def main():
                 url = base_dst_api_url + '/projects/' + project_uuid + "/close"
                 data = "{}"
                 r = requests.post(url, data, auth=(username, password))
-                if not r.status_code == 201:
+                if not r.status_code == 201 and not r.status_code == 204:
                     if r.status_code == 404:
                         logger.debug("Destination project did not exist before, not closed")
                     else:
@@ -307,6 +307,10 @@ def main():
                 if not r.status_code == 201:
                     if r.status_code == 403:
                         logger.fatal("Forbidden to import project on target server.")
+                        raise ProxyError()
+                    elif r.status_code == 409:
+                        logger.fatal("Project already partially created. Previous import seems to be interrupted. "
+                                     "Try to restart GNS3 target server backend.")
                         raise ProxyError()
                     else:
                         logger.fatal("Unable to import project on target server.")

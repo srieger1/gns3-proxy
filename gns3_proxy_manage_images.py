@@ -21,13 +21,13 @@ from ipaddress import ip_address
 
 import requests
 
-VERSION = (0, 1)
+VERSION = (0, 2)
 __version__ = '.'.join(map(str, VERSION[0:2]))
 __description__ = 'GNS3 Proxy Manage Images'
 __author__ = 'Sebastian Rieger'
 __author_email__ = 'sebastian@riegers.de'
 __homepage__ = 'https://github.com/srieger1/gns3-proxy'
-__download_url__ = '%s/archive/master.zip' % __homepage__
+__download_url__ = '%s/archive/develop.zip' % __homepage__
 __license__ = 'BSD'
 
 logger = logging.getLogger(__name__)
@@ -81,6 +81,9 @@ def parse_args(args):
     parser.add_argument('--image-filename', type=str, required=True,
                         help='Name of the image to be managed.'
                              'Can be specified as a regular expression to match multiple images.')
+
+    parser.add_argument('--buffer', type=int, required=False, default=8192,
+                        help='Number of bytes to use for buffering download and upload of images.')
 
     action_group = parser.add_mutually_exclusive_group(required=True)
     action_group.add_argument('--export-to-dir', type=str,
@@ -206,8 +209,9 @@ def main():
                                     filename = str(server) + "_" + time.strftime("%Y%m%d-%H%M%S") + image['filename']
                                     url = base_dst_api_url + IMAGE_BACKEND_URL + '/' + image['filename']
                                     r = requests.get(url, auth=(username, password), stream=True)
-                                    with open(os.path.join(args.export_to_dir, filename), 'wb') as outfile:
-                                        for chunk in r.iter_content(chunk_size=1024 * 1024):
+                                    with open(os.path.join(args.export_to_dir, filename), 'wb', args.buffer) \
+                                            as outfile:
+                                        for chunk in r.iter_content(chunk_size=args.buffer):
                                             if chunk:
                                                 outfile.write(chunk)
 
@@ -270,8 +274,10 @@ def main():
                             logger.debug("Importing image")
                             # import image
                             url = base_dst_api_url + ALT_IMAGE_BACKEND_URL + '/' + args.image_filename
-                            files = {'file': open(args.import_from_file, 'rb')}
-                            r = requests.post(url, files=files, auth=(username, password))
+                            # files = {'file': open(args.import_from_file, 'rb', args.buffer)}
+                            # r = requests.post(url, files=files, auth=(username, password))
+                            with open(args.import_from_file, 'rb', args.buffer) as f:
+                                r = requests.post(url, auth=(username, password), data=f)
                             if not r.status_code == 200:
                                 if r.status_code == 403:
                                     logger.fatal("Forbidden to import image on target server.")

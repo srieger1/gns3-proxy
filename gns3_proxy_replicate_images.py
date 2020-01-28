@@ -21,13 +21,13 @@ from ipaddress import ip_address
 
 import requests
 
-VERSION = (0, 1)
+VERSION = (0, 2)
 __version__ = '.'.join(map(str, VERSION[0:2]))
 __description__ = 'GNS3 Proxy Replicate Images'
 __author__ = 'Sebastian Rieger'
 __author_email__ = 'sebastian@riegers.de'
 __homepage__ = 'https://github.com/srieger1/gns3-proxy'
-__download_url__ = '%s/archive/master.zip' % __homepage__
+__download_url__ = '%s/archive/develop.zip' % __homepage__
 __license__ = 'BSD'
 
 logger = logging.getLogger(__name__)
@@ -80,6 +80,13 @@ def parse_args(args):
     parser.add_argument('--image-filename', type=str, required=True,
                         help='Name of the image to be replicated.'
                              'Can be specified as a regular expression to match multiple images.')
+
+    parser.add_argument('--tempfile-dir', type=str, required=False, default=None,
+                        help='Create temporary files in the referenced directory. If the option is not used,'
+                             'the default tmp directory of the system will be used.')
+
+    parser.add_argument('--buffer', type=int, required=False, default=8192,
+                        help='Number of bytes to use for buffering download and upload of images.')
 
     parser.add_argument('--source-server', type=str, required=True,
                         help='Source server to copy images from. A name of a server/backend defined in the '
@@ -185,7 +192,7 @@ def main():
         for image in images:
             image_filename = image['filename']
             print("#### Replicating image: %s" % image_filename)
-            tmp_file = tempfile.TemporaryFile()
+            tmp_file = tempfile.TemporaryFile(buffering=args.buffer, dir=args.tempfile_dir)
 
             # export source image
             logger.debug("Exporting source image")
@@ -275,8 +282,9 @@ def main():
                     # import image
                     url = base_dst_api_url + ALT_IMAGE_BACKEND_URL + '/' + image_filename
                     tmp_file.seek(0)
-                    files = {'file': tmp_file}
-                    r = requests.post(url, files=files, auth=(username, password))
+                    #files = {'file': tmp_file}
+                    #r = requests.post(url, files=files, auth=(username, password))
+                    r = requests.post(url, auth=(username, password), data=tmp_file)
                     if not r.status_code == 200:
                         if r.status_code == 403:
                             logger.fatal("Forbidden to import image on target server.")

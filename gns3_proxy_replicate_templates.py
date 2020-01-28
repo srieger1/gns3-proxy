@@ -25,7 +25,7 @@ __description__ = 'GNS3 Proxy Replicate Templates'
 __author__ = 'Sebastian Rieger'
 __author_email__ = 'sebastian@riegers.de'
 __homepage__ = 'https://github.com/srieger1/gns3-proxy'
-__download_url__ = '%s/archive/master.zip' % __homepage__
+__download_url__ = '%s/archive/develop.zip' % __homepage__
 __license__ = 'BSD'
 
 logger = logging.getLogger(__name__)
