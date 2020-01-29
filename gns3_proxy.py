@@ -7,7 +7,7 @@
 
     based on proxy.py - HTTP Proxy Server in Python - copyright: (c) 2013-2018 by Abhinav Singh
 
-    :copyright: (c) 2019 by Sebastian Rieger.
+    :copyright: (c) 2020 by Sebastian Rieger.
     :license: BSD, see LICENSE for more details.
 """
 

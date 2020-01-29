@@ -5,7 +5,7 @@
 
     Replication of GNS3 images across multiple backend nodes, e.g., behind a GNS3 proxy
 
-    :copyright: (c) 2019 by Sebastian Rieger.
+    :copyright: (c) 2020 by Sebastian Rieger.
     :license: BSD, see LICENSE for more details.
 """
 
