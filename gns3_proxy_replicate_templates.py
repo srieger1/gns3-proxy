@@ -5,7 +5,7 @@
 
     Replication of GNS3 templates across multiple backend nodes, e.g., behind a GNS3 proxy
 
-    :copyright: (c) 2019 by Sebastian Rieger.
+    :copyright: (c) 2020 by Sebastian Rieger.
     :license: BSD, see LICENSE for more details.
 """
 
@@ -16,6 +16,7 @@ import logging
 import re
 import sys
 from ipaddress import ip_address
+from packaging import version
 
 import requests
 
@@ -155,6 +156,20 @@ def main():
             raise ProxyError()
 
         base_src_api_url = "http://" + src_server + ":" + str(backend_port) + "/v2"
+        url = base_src_api_url + '/version'
+        r = requests.get(url, auth=(username, password))
+        if r.status_code == 200:
+            version_results = json.loads(r.text)
+            server_version = version_results['version']
+            if version.parse(server_version) < version.parse("2.2.0"):
+                logger.fatal("Source server must use GNS3 >= 2.2. Template format has changed. You can use"
+                             " gns3_proxy_manage_templates.py to export templates from 2.1, automatically"
+                             " convert them to GNS3 2.2 format and import them to a new GNS3 2.2 server.")
+                raise ProxyError()
+        else:
+            logger.fatal("Could not connect to source server. Could not determine its version.")
+            raise ProxyError()
+
         logger.debug("Searching source templates")
         templates = list()
         url = base_src_api_url + '/templates'
@@ -176,11 +191,12 @@ def main():
 
         for template in templates:
             template_name = template['name']
+            template_id = template['template_id']
 
             # skip builtin templates like Cloud, NAT, VPCS, Ethernet switch, Ethernet hub, Frame Relay switch, ATM switch
             if template['builtin']:
                 print("#### Skipping builtin template: %s" % template_name)
-                break
+                continue
 
             print("#### Replicating template: %s" % template_name)
 
@@ -211,36 +227,49 @@ def main():
             for target_server_address in target_server_addresses:
                 logger.debug("    #### Replicating template: %s to server: %s" % (template_name, target_server_address))
                 base_dst_api_url = "http://" + target_server_address + ":" + str(backend_port) + "/v2"
+                url = base_dst_api_url + '/version'
+                r = requests.get(url, auth=(username, password))
+                if r.status_code == 200:
+                    version_results = json.loads(r.text)
+                    server_version = version_results['version']
+                    if version.parse(server_version) < version.parse("2.2.0"):
+                        logger.fatal("Target server must use GNS3 >= 2.2. Template format has changed. You can use"
+                                     " gns3_proxy_manage_templates.py to export templates from 2.1, automatically"
+                                     " convert them to GNS3 2.2 format and import them to a new GNS3 2.2 server.")
+                        raise ProxyError()
+                else:
+                    logger.fatal("Could not connect to source server. Could not determine its version.")
+                    raise ProxyError()
 
-                logger.debug("Checking if target template exists...")
+                logger.debug("Checking if target template name exists...")
                 url = base_dst_api_url + '/templates'
                 r = requests.get(url, auth=(username, password))
                 if r.status_code == 200:
-                    target_template_exists = False
-                    target_template_to_delete = None
+                    target_template_name_exists = False
+                    target_template_name_to_delete = None
                     target_template_results = json.loads(r.text)
                     for target_template in target_template_results:
                         if re.fullmatch(template_name, target_template['name']):
-                            logger.debug("Template: %s already exists on server %s"
+                            logger.debug("Template name: %s already exists on server %s"
                                          % (target_template['name'], target_server_address))
-                            if target_template_exists:
+                            if target_template_name_exists:
                                 logger.fatal(
-                                    "Multiple templates matched %s on server %s. "
+                                    "Multiple templates matched name %s on server %s. "
                                     "Import can only be used for single template." % (
                                         template_name, target_server_address))
                                 raise ProxyError()
                             else:
-                                target_template_to_delete = target_template
-                                target_template_exists = True
-                    if target_template_exists:
+                                target_template_name_to_delete = target_template
+                                target_template_name_exists = True
+                    if target_template_name_exists:
                         if args.force:
-                            print("#### Forcing deletion of template %s on server: %s" % (
-                                target_template_to_delete['name'], target_server_address))
+                            print("#### Forcing deletion of template name %s on server: %s" % (
+                                target_template_name_to_delete['name'], target_server_address))
 
-                            logger.debug("Deleting template %s on server: %s"
-                                         % (target_template_to_delete['name'], target_server_address))
+                            logger.debug("Deleting template name %s on server: %s"
+                                         % (target_template_name_to_delete['name'], target_server_address))
                             r = requests.delete(
-                                base_dst_api_url + '/templates/' + target_template_to_delete['template_id'],
+                                base_dst_api_url + '/templates/' + target_template_name_to_delete['template_id'],
                                 auth=(username, password))
                             if not r.status_code == 204:
                                 if r.status_code == 404:
@@ -249,14 +278,60 @@ def main():
                                     logger.fatal("unable to delete template")
                                     raise ProxyError()
                             else:
-                                print("#### Deleted template %s on server: %s"
-                                      % (target_template_to_delete['name'], target_server_address))
+                                print("#### Deleted template name %s on server: %s"
+                                      % (target_template_name_to_delete['name'], target_server_address))
                         else:
                             logger.fatal(
-                                "Template: %s already exists on server %s. Use --force to overwrite it"
+                                "Template name: %s already exists on server %s. Use --force to overwrite it"
                                 " during import."
-                                % (target_template_to_delete['name'], target_server_address))
+                                % (target_template_name_to_delete['name'], target_server_address))
                             raise ProxyError()
+
+                    logger.debug("Checking if target template id exists...")
+                    url = base_dst_api_url + '/templates'
+                    r = requests.get(url, auth=(username, password))
+                    if r.status_code == 200:
+                        target_template_id_exists = False
+                        target_template_id_to_delete = None
+                        target_template_results = json.loads(r.text)
+                        for target_template in target_template_results:
+                            if re.fullmatch(template_id, target_template['template_id']):
+                                logger.debug("Template id: %s already exists on server %s"
+                                             % (target_template['template_id'], target_server_address))
+                                if target_template_id_exists:
+                                    logger.fatal(
+                                        "Multiple templates matched id %s on server %s. "
+                                        "Import can only be used for single template." % (
+                                            template_id, target_server_address))
+                                    raise ProxyError()
+                                else:
+                                    target_template_id_to_delete = target_template
+                                    target_template_id_exists = True
+                        if target_template_id_exists:
+                            if args.force:
+                                print("#### Forcing deletion of template id %s on server: %s" % (
+                                    target_template_id_to_delete['template_id'], target_server_address))
+
+                                logger.debug("Deleting template id %s on server: %s"
+                                             % (target_template_id_to_delete['template_id'], target_server_address))
+                                r = requests.delete(
+                                    base_dst_api_url + '/templates/' + target_template_id_to_delete['template_id'],
+                                    auth=(username, password))
+                                if not r.status_code == 204:
+                                    if r.status_code == 404:
+                                        logger.debug("Template did not exist before, not deleted")
+                                    else:
+                                        logger.fatal("unable to delete template")
+                                        raise ProxyError()
+                                else:
+                                    print("#### Deleted template id %s on server: %s"
+                                          % (target_template_id_to_delete['template-id'], target_server_address))
+                            else:
+                                logger.fatal(
+                                    "Template id: %s already exists on server %s. Use --force to overwrite it"
+                                    " during import."
+                                    % (target_template_id_to_delete['template_id'], target_server_address))
+                                raise ProxyError()
 
                     logger.debug("Importing template")
                     # import template

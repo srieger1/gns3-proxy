@@ -5,7 +5,7 @@
 
     Management of GNS3 images across multiple backend nodes, e.g., behind a GNS3 proxy
 
-    :copyright: (c) 2019 by Sebastian Rieger.
+    :copyright: (c) 2020 by Sebastian Rieger.
     :license: BSD, see LICENSE for more details.
 """
 
@@ -18,6 +18,7 @@ import sys
 import os
 import time
 from ipaddress import ip_address
+from packaging import version
 
 import requests
 
@@ -50,6 +51,7 @@ DEFAULT_LOG_LEVEL = 'INFO'
 DEFAULT_DELETE_ACTION = False
 DEFAULT_SHOW_ACTION = False
 DEFAULT_FORCE = False
+DEFAULT_INCLUDE_BUILTIN = False
 
 
 class ProxyError(Exception):
@@ -76,6 +78,9 @@ def parse_args(args):
     parser.add_argument('--template-name', type=str, required=True,
                         help='Name of the template to be managed.'
                              'Can be specified as a regular expression to match multiple templates.')
+
+    parser.add_argument('--include-builtin', action='store_true', default=DEFAULT_INCLUDE_BUILTIN,
+                        help='Include builtin templates.')
 
     action_group = parser.add_mutually_exclusive_group(required=True)
     action_group.add_argument('--export-to-dir', type=str,
@@ -167,15 +172,49 @@ def main():
                     # build target server API URL
                     base_dst_api_url = "http://" + config_servers[server] + ":" + str(backend_port) + "/v2"
 
+                    # check version of target server, template format changed from GNS3 2.1 to 2.2
+
+                    url = base_dst_api_url + '/version'
+                    r = requests.get(url, auth=(username, password))
+                    if r.status_code == 200:
+                        version_results = json.loads(r.text)
+                        server_version = version_results['version']
+                        if version.parse(server_version) < version.parse("2.2.0"):
+                            # logger.fatal("Target server must use GNS3 >= 2.2. Template format has changed. See GNS3 "
+                            #              "2.2 installation documentation, for steps to migrate GNS3 server from 2.1 "
+                            #              "to 2.2.")
+                            # raise ProxyError()
+
+                            print("Target server is running GNS3 <2.2 (%s) using old appliance template API" %
+                                  server_version)
+                            new_template_api = False
+                        else:
+                            print("Target server is running GNS3 >=2.2 (%s) using new template API" %
+                                  server_version)
+                            new_template_api = True
+                    else:
+                        logger.fatal("Could not connect to target server. Could not determine its version.")
+                        raise ProxyError()
+
                     if args.show:
                         print("#### Showing template %s on server: %s" % (args.template_name, server))
 
                         logger.debug("Getting templates...")
-                        url = base_dst_api_url + '/templates'
+                        if new_template_api:
+                            url = base_dst_api_url + '/templates'
+                        else:
+                            url = base_dst_api_url + '/appliances'
                         r = requests.get(url, auth=(username, password))
                         if r.status_code == 200:
                             template_results = json.loads(r.text)
                             for template in template_results:
+
+                                # skip builtin templates like Cloud, NAT, VPCS, Ethernet switch, Ethernet hub,
+                                # Frame Relay switch, ATM switch
+                                if template['builtin'] and args.include_builtin is False:
+                                    logger.debug("#### Skipping builtin template: %s" % template['name'])
+                                    continue
+
                                 if re.fullmatch(args.template_name, template['name']):
                                     print("#### Server: %s, Template: %s"
                                           % (server, template))
@@ -187,18 +226,38 @@ def main():
                         print("#### Deleting template %s on server: %s" % (args.template_name, server))
 
                         logger.debug("Getting templates...")
-                        url = base_dst_api_url + '/templates'
+                        if new_template_api:
+                            url = base_dst_api_url + '/templates'
+                        else:
+                            logger.fatal("Deletion of templates is not supported on target servers using GNS3"
+                                         " <2.2 (old template API).")
+                            raise ProxyError()
+
                         r = requests.get(url, auth=(username, password))
                         if r.status_code == 200:
                             template_results = json.loads(r.text)
                             for template in template_results:
+
+                                # skip builtin templates like Cloud, NAT, VPCS, Ethernet switch, Ethernet hub,
+                                # Frame Relay switch, ATM switch
+                                if template['builtin'] and args.include_builtin is False:
+                                    logger.debug("#### Skipping builtin template: %s" % template['name'])
+                                    continue
+
                                 if re.fullmatch(args.template_name, template['name']):
                                     if args.force:
                                         logger.debug("Deleting template %s on server: %s"
                                                      % (template['name'], config_servers[server]))
-                                        r = requests.delete(
-                                            base_dst_api_url + '/templates/' + template['template_id'],
-                                            auth=(username, password))
+
+                                        if new_template_api:
+                                            r = requests.delete(
+                                                base_dst_api_url + '/templates/' + template['template_id'],
+                                                auth=(username, password))
+                                        else:
+                                            r = requests.delete(
+                                                base_dst_api_url + '/appliances/' + template['appliance_id'],
+                                                auth=(username, password))
+
                                         if not r.status_code == 204:
                                             if r.status_code == 404:
                                                 logger.debug("Template did not exist before, not deleted")
@@ -219,18 +278,111 @@ def main():
                         print("#### Exporting template %s on server: %s" % (args.template_name, server))
 
                         logger.debug("Getting templates from target server...")
-                        url = base_dst_api_url + '/templates'
+                        if new_template_api:
+                            url = base_dst_api_url + '/templates'
+                        else:
+                            url = base_dst_api_url + '/appliances'
                         r = requests.get(url, auth=(username, password))
                         if r.status_code == 200:
                             template_exists = False
                             template_results = json.loads(r.text)
                             for template in template_results:
+
+                                # skip builtin templates like Cloud, NAT, VPCS, Ethernet switch, Ethernet hub,
+                                # Frame Relay switch, ATM switch
+                                if template['builtin'] and args.include_builtin is False:
+                                    logger.debug("#### Skipping builtin template: %s" % template['name'])
+                                    continue
+
                                 if re.fullmatch(args.template_name, template['name']):
                                     logger.debug("Found template: %s on server %s"
                                                  % (template['name'], server))
-                                    filename = str(server) + "_" + template['name'] + "_" + template[
-                                        'template_id'] + "_" + \
-                                               time.strftime("%Y%m%d-%H%M%S") + ".gns3a"
+
+                                    if new_template_api:
+                                        filename = str(server) + "_" + template['template_type'] + "_" \
+                                                   + template['name'] + "_" + template['template_id'] + "_" \
+                                                   + time.strftime("%Y%m%d-%H%M%S") + ".gns3a"
+                                    else:
+                                        filename = "MIGRATED_" + str(server) + "_" + template['node_type'] + "_" \
+                                                   + template['name'] + "_" + template['appliance_id'] + "_" \
+                                                   + time.strftime("%Y%m%d-%H%M%S") + ".gns3a"
+
+                                        # old <2.2 GNS3 API did not include config of the template in appliance
+                                        # definition needs to be extracted from settings
+                                        url = base_dst_api_url + '/settings'
+                                        r = requests.get(url, auth=(username, password))
+                                        if r.status_code == 200:
+                                            settings_results = json.loads(r.text)
+                                            if template['node_type'] == "cloud":
+                                                for cloud_node in settings_results['Builtin']['cloud_nodes']:
+                                                    if cloud_node['name'] == template['name']:
+                                                        template.update(cloud_node)
+
+                                            elif template['node_type'] == "ethernet_hub":
+                                                for ethernet_hub_node in settings_results['Builtin']['ethernet_hubs']:
+                                                    if ethernet_hub_node['name'] == template['name']:
+                                                        template.update(ethernet_hub_node)
+
+                                            elif template['node_type'] == "ethernet_switch":
+                                                for ethernet_switch_node in \
+                                                        settings_results['Builtin']['ethernet_switches']:
+                                                    if ethernet_switch_node['name'] == template['name']:
+                                                        template.update(ethernet_switch_node)
+
+                                            elif template['node_type'] == "docker":
+                                                for container_node in settings_results['Docker']['containers']:
+                                                    if container_node['name'] == template['name']:
+                                                        template.update(container_node)
+
+                                            elif template['node_type'] == "dynamips":
+                                                for router_node in settings_results['Dynamips']['routers']:
+                                                    if router_node['name'] == template['name']:
+                                                        template.update(router_node)
+
+                                            elif template['node_type'] == "iou":
+                                                for iou_node in settings_results['IOU']['devices']:
+                                                    if iou_node['name'] == template['name']:
+                                                        template.update(iou_node)
+
+                                            elif template['node_type'] == "qemu":
+                                                for vm_node in settings_results['Qemu']['vms']:
+                                                    if vm_node['name'] == template['name']:
+                                                        vm_node.pop('acpi_shutdown', None)
+                                                        template.update(vm_node)
+
+                                            elif template['node_type'] == "vmware":
+                                                for vmware_node in settings_results['VMware']['vms']:
+                                                    if vmware_node['name'] == template['name']:
+                                                        template.update(vmware_node)
+
+                                            elif template['node_type'] == "vpcs":
+                                                for vpc_node in settings_results['VPCS']['nodes']:
+                                                    if vpc_node['name'] == template['name']:
+                                                        template.update(vpc_node)
+
+                                            elif template['node_type'] == "virtualbox":
+                                                for virtualbox_node in settings_results['VirtualBox']['vms']:
+                                                    if virtualbox_node['name'] == template['name']:
+                                                        template.update(virtualbox_node)
+
+                                            else:
+                                                logger.fatal(
+                                                    "Template type %s of template %s not supported. Cannot be "
+                                                    "converted."
+                                                    % (template['template_type'], template['name']))
+                                                raise ProxyError()
+
+                                        else:
+                                            logger.fatal(
+                                                "Could not get settings to export template to new format for %s."
+                                                % template['name'])
+                                            raise ProxyError()
+
+                                    # old <2.2 GNS3 API used appliance_id and node_type, needs to be
+                                    # converted to be able to import template to 2.2
+                                    template['template_id'] = template.pop('appliance_id')
+                                    template['template_type'] = template.pop('node_type')
+
                                     with open(os.path.join(args.export_to_dir, filename), 'w',
                                               encoding="utf8") as outfile:
                                         json.dump(template, outfile, sort_keys=True, indent=4)
@@ -247,7 +399,12 @@ def main():
                         print("#### Importing template %s on server: %s" % (args.template_name, server))
 
                         logger.debug("Checking if target template exists...")
-                        url = base_dst_api_url + '/templates'
+                        if new_template_api:
+                            url = base_dst_api_url + '/templates'
+                        else:
+                            logger.fatal("Import of templates is not supported on target servers using GNS3"
+                                         " <2.2 (old template API).")
+                            raise ProxyError()
                         r = requests.get(url, auth=(username, password))
                         if r.status_code == 200:
                             template_exists = False
@@ -308,7 +465,7 @@ def main():
                                     raise ProxyError()
                             else:
                                 print("#### Template %s imported from file: %s on server: %s"
-                                      % (args.template_name, args.import_from_file, server))
+                                      % (template['name'], args.import_from_file, server))
 
                         else:
                             logger.fatal("Could not get status of templates from server %s." % config_servers[server])
