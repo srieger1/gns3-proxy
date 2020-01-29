@@ -378,10 +378,10 @@ def main():
                                                 % template['name'])
                                             raise ProxyError()
 
-                                    # old <2.2 GNS3 API used appliance_id and node_type, needs to be
-                                    # converted to be able to import template to 2.2
-                                    template['template_id'] = template.pop('appliance_id')
-                                    template['template_type'] = template.pop('node_type')
+                                        # old <2.2 GNS3 API used appliance_id and node_type, needs to be
+                                        # converted to be able to import template to 2.2
+                                        template['template_id'] = template.pop('appliance_id')
+                                        template['template_type'] = template.pop('node_type')
 
                                     with open(os.path.join(args.export_to_dir, filename), 'w',
                                               encoding="utf8") as outfile:
