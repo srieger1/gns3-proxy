@@ -20,7 +20,7 @@ from packaging import version
 
 import requests
 
-VERSION = (0, 2)
+VERSION = (0, 3)
 __version__ = '.'.join(map(str, VERSION[0:2]))
 __description__ = 'GNS3 Proxy Replicate Templates'
 __author__ = 'Sebastian Rieger'
