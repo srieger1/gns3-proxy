@@ -1,2 +1,3 @@
 #!/bin/bash
-docker run -itd --name gns3proxy -v $(pwd)/gns3_proxy_config.ini:/home/gns3_proxy/gns3_proxy_config.ini:ro -v $(pwd)/gns3_proxy_crontab:/var/spool/cron/crontabs/gns3_proxy:ro -p 0.0.0.0:14080:14080/tcp flex/gns3-proxy
+#docker run -itd --name gns3proxy -v $(pwd)/gns3_proxy_config.ini:/home/gns3_proxy/gns3_proxy_config.ini:ro -v $(pwd)/gns3_proxy_crontab:/var/spool/cron/crontabs/gns3_proxy:ro -p 0.0.0.0:14080:14080/tcp flex/gns3-proxy
+docker run --restart=always -itd --name gns3proxy -v /opt/gns3/images:/opt/gns3/images -v $(pwd)/gns3_proxy_config.ini:/home/gns3_proxy/gns3_proxy_config.ini:ro -v $(pwd)/gns3_proxy_crontab:/var/spool/cron/crontabs/gns3_proxy:ro -p 0.0.0.0:14080:14080/tcp flex/gns3-proxy
