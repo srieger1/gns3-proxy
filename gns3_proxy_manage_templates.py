@@ -369,7 +369,7 @@ def main():
                                                 logger.fatal(
                                                     "Template type %s of template %s not supported. Cannot be "
                                                     "converted."
-                                                    % (template['template_type'], template['name']))
+                                                    % (template['node_type'], template['name']))
                                                 raise ProxyError()
 
                                         else:

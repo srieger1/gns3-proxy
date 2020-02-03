@@ -20,7 +20,7 @@ from packaging import version
 
 import requests
 
-VERSION = (0, 3)
+VERSION = (0, 4)
 __version__ = '.'.join(map(str, VERSION[0:2]))
 __description__ = 'GNS3 Proxy Replicate Templates'
 __author__ = 'Sebastian Rieger'
@@ -156,23 +156,35 @@ def main():
             raise ProxyError()
 
         base_src_api_url = "http://" + src_server + ":" + str(backend_port) + "/v2"
+
         url = base_src_api_url + '/version'
         r = requests.get(url, auth=(username, password))
         if r.status_code == 200:
             version_results = json.loads(r.text)
             server_version = version_results['version']
             if version.parse(server_version) < version.parse("2.2.0"):
-                logger.fatal("Source server must use GNS3 >= 2.2. Template format has changed. You can use"
-                             " gns3_proxy_manage_templates.py to export templates from 2.1, automatically"
-                             " convert them to GNS3 2.2 format and import them to a new GNS3 2.2 server.")
-                raise ProxyError()
+                # logger.fatal("Target server must use GNS3 >= 2.2. Template format has changed. See GNS3 "
+                #              "2.2 installation documentation, for steps to migrate GNS3 server from 2.1 "
+                #              "to 2.2.")
+                # raise ProxyError()
+
+                print("Source server is running GNS3 <2.2 (%s) using old appliance template API" %
+                      server_version)
+                src_new_template_api = False
+            else:
+                print("Source server is running GNS3 >=2.2 (%s) using new template API" %
+                      server_version)
+                src_new_template_api = True
         else:
-            logger.fatal("Could not connect to source server. Could not determine its version.")
+            logger.fatal("Could not connect to target server. Could not determine its version.")
             raise ProxyError()
 
         logger.debug("Searching source templates")
         templates = list()
-        url = base_src_api_url + '/templates'
+        if src_new_template_api:
+            url = base_src_api_url + '/templates'
+        else:
+            url = base_src_api_url + '/appliances'
 
         r = requests.get(url, auth=(username, password))
         if not r.status_code == 200:
@@ -182,7 +194,97 @@ def main():
             template_results = json.loads(r.text)
             for template in template_results:
                 if re.fullmatch(args.template_name, template['name']):
-                    logger.debug('matched image: %s' % template['name'])
+                    logger.debug('matched template: %s' % template['name'])
+
+                    # skip builtin templates like Cloud, NAT, VPCS, Ethernet switch, Ethernet hub, Frame Relay switch,
+                    # ATM switch
+                    if template['builtin']:
+                        print("#### Skipping builtin template: %s" % template['name'])
+                        continue
+
+                    if not src_new_template_api:
+                        # old <2.2 GNS3 API did not include config of the template in appliance
+                        # definition needs to be extracted from settings
+                        url = base_src_api_url + '/settings'
+                        r = requests.get(url, auth=(username, password))
+                        if r.status_code == 200:
+                            settings_results = json.loads(r.text)
+                            if template['node_type'] == "cloud":
+                                for cloud_node in settings_results['Builtin']['cloud_nodes']:
+                                    if cloud_node['name'] == template['name']:
+                                        template.update(cloud_node)
+                                        template.pop('platform', None)
+
+                            elif template['node_type'] == "ethernet_hub":
+                                for ethernet_hub_node in settings_results['Builtin']['ethernet_hubs']:
+                                    if ethernet_hub_node['name'] == template['name']:
+                                        template.update(ethernet_hub_node)
+                                        template.pop('platform', None)
+
+                            elif template['node_type'] == "ethernet_switch":
+                                for ethernet_switch_node in \
+                                        settings_results['Builtin']['ethernet_switches']:
+                                    if ethernet_switch_node['name'] == template['name']:
+                                        template.update(ethernet_switch_node)
+                                        template.pop('platform', None)
+
+                            elif template['node_type'] == "docker":
+                                for container_node in settings_results['Docker']['containers']:
+                                    if container_node['name'] == template['name']:
+                                        template.update(container_node)
+                                        template.pop('platform', None)
+
+                            elif template['node_type'] == "dynamips":
+                                for router_node in settings_results['Dynamips']['routers']:
+                                    if router_node['name'] == template['name']:
+                                        template.update(router_node)
+
+                            elif template['node_type'] == "iou":
+                                for iou_node in settings_results['IOU']['devices']:
+                                    if iou_node['name'] == template['name']:
+                                        template.update(iou_node)
+                                        template.pop('platform', None)
+
+                            elif template['node_type'] == "qemu":
+                                for vm_node in settings_results['Qemu']['vms']:
+                                    if vm_node['name'] == template['name']:
+                                        vm_node.pop('acpi_shutdown', None)
+                                        template.update(vm_node)
+
+                            elif template['node_type'] == "vmware":
+                                for vmware_node in settings_results['VMware']['vms']:
+                                    if vmware_node['name'] == template['name']:
+                                        template.update(vmware_node)
+
+                            elif template['node_type'] == "vpcs":
+                                for vpc_node in settings_results['VPCS']['nodes']:
+                                    if vpc_node['name'] == template['name']:
+                                        template.update(vpc_node)
+                                        template.pop('platform', None)
+
+                            elif template['node_type'] == "virtualbox":
+                                for virtualbox_node in settings_results['VirtualBox']['vms']:
+                                    if virtualbox_node['name'] == template['name']:
+                                        template.update(virtualbox_node)
+
+                            else:
+                                logger.fatal(
+                                    "Template type %s of template %s not supported. Cannot be "
+                                    "converted."
+                                    % (template['node_type'], template['name']))
+                                raise ProxyError()
+
+                        else:
+                            logger.fatal(
+                                "Could not get settings to export template to new format for %s."
+                                % template['name'])
+                            raise ProxyError()
+
+                        # old <2.2 GNS3 API used appliance_id and node_type, needs to be
+                        # converted to be able to import template to 2.2
+                        template['template_id'] = template.pop('appliance_id')
+                        template['template_type'] = template.pop('node_type')
+
                     templates.append(template)
 
         if len(templates) == 0:
@@ -192,11 +294,6 @@ def main():
         for template in templates:
             template_name = template['name']
             template_id = template['template_id']
-
-            # skip builtin templates like Cloud, NAT, VPCS, Ethernet switch, Ethernet hub, Frame Relay switch, ATM switch
-            if template['builtin']:
-                print("#### Skipping builtin template: %s" % template_name)
-                continue
 
             print("#### Replicating template: %s" % template_name)
 
@@ -338,7 +435,8 @@ def main():
                     url = base_dst_api_url + '/templates'
                     headers = {'content-type': 'application/json'}
                     r = requests.post(url, auth=(username, password),
-                                      data=json.dumps(template, sort_keys=True, indent=4), verify=False, headers=headers)
+                                      data=json.dumps(template, sort_keys=True, indent=4), verify=False,
+                                      headers=headers)
                     if not r.status_code == 201:
                         if r.status_code == 403:
                             logger.fatal("Forbidden to import template on target server.")

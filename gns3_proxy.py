@@ -21,7 +21,7 @@
 # TODO: show proxy errors (e.g., console_host misconfiguration) explicitly in GNS3 GUI - if possible?
 # TODO: web interface for manual replication and start/stop
 # TODO: reservation system? Allowing certain users to access server backends or projects in specific timeframes
-# TODO: exam environment? Look down access to certain projects and export current state?
+# TODO: exam environment? Lock down access to certain projects and export current state?
 
 # TODO: LDAP integration for user login? Would require SSL connection to server which was dropped for GNS3 2.x, if
 #       we tackle this, also authentication for console access could be addressed (e.g., using websockify instead of
