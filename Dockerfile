@@ -7,6 +7,7 @@ LABEL de.hs-fulda.netlab.name="flex/gns3-proxy" \
 #      de.hs-fulda.netlab.vcs-ref="" \
       de.hs-fulda.netlab.docker.cmd="docker run -it --rm -p 14080:14080 flex/gns3-proxy"
 
+RUN apk add --update --no-cache openssh-client
 RUN adduser -S gns3_proxy
 
 COPY gns3_proxy.py /usr/local/bin/
