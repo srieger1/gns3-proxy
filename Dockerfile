@@ -22,6 +22,7 @@ EXPOSE 14080/tcp
 RUN chmod +x /usr/local/bin/*.py
 
 RUN pip install requests
+RUN pip install packaging
 
 WORKDIR /home/gns3_proxy
 CMD ["sh", "-c", "crond && gns3_proxy.py"]
