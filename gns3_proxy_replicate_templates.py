@@ -213,41 +213,40 @@ def main():
                                 for cloud_node in settings_results['Builtin']['cloud_nodes']:
                                     if cloud_node['name'] == template['name']:
                                         template.update(cloud_node)
-                                        template.pop('platform', None)
 
                             elif template['node_type'] == "ethernet_hub":
                                 for ethernet_hub_node in settings_results['Builtin']['ethernet_hubs']:
                                     if ethernet_hub_node['name'] == template['name']:
                                         template.update(ethernet_hub_node)
-                                        template.pop('platform', None)
 
                             elif template['node_type'] == "ethernet_switch":
                                 for ethernet_switch_node in \
                                         settings_results['Builtin']['ethernet_switches']:
                                     if ethernet_switch_node['name'] == template['name']:
                                         template.update(ethernet_switch_node)
-                                        template.pop('platform', None)
 
                             elif template['node_type'] == "docker":
                                 for container_node in settings_results['Docker']['containers']:
                                     if container_node['name'] == template['name']:
                                         template.update(container_node)
-                                        template.pop('platform', None)
 
                             elif template['node_type'] == "dynamips":
                                 for router_node in settings_results['Dynamips']['routers']:
                                     if router_node['name'] == template['name']:
+                                        # 'chassis' and 'iomem' not supported in GNS3 >=2.2
+                                        router_node.pop('chassis', None)
+                                        router_node.pop('iomem', None)
                                         template.update(router_node)
 
                             elif template['node_type'] == "iou":
                                 for iou_node in settings_results['IOU']['devices']:
                                     if iou_node['name'] == template['name']:
                                         template.update(iou_node)
-                                        template.pop('platform', None)
 
                             elif template['node_type'] == "qemu":
                                 for vm_node in settings_results['Qemu']['vms']:
                                     if vm_node['name'] == template['name']:
+                                        # 'acpi_shutdown' not supported in GNS3 >=2.2
                                         vm_node.pop('acpi_shutdown', None)
                                         template.update(vm_node)
 
@@ -260,7 +259,6 @@ def main():
                                 for vpc_node in settings_results['VPCS']['nodes']:
                                     if vpc_node['name'] == template['name']:
                                         template.update(vpc_node)
-                                        template.pop('platform', None)
 
                             elif template['node_type'] == "virtualbox":
                                 for virtualbox_node in settings_results['VirtualBox']['vms']:
@@ -282,8 +280,20 @@ def main():
 
                         # old <2.2 GNS3 API used appliance_id and node_type, needs to be
                         # converted to be able to import template to 2.2
+
+                        # 'appliance_id' is now 'template_id' in GNS3 2.2
+                        # 'node_type' is now 'template_type' in GNS3 2.2
                         template['template_id'] = template.pop('appliance_id')
                         template['template_type'] = template.pop('node_type')
+
+                        # platform could be null is old GNS3 2.1 templates, GNS3 2.2 only allows the following:
+                        # None is not one of [\'aarch64\', \'alpha\', \'arm\', \'cris\', \'i386\', \'lm32\', \'m68k\',
+                        # \'microblaze\', \'microblazeel\', \'mips\', \'mips64\', \'mips64el\', \'mipsel\', \'moxie\',
+                        # \'or32\', \'ppc\', \'ppc64\', \'ppcemb\', \'s390x\', \'sh4\', \'sh4eb\', \'sparc\',
+                        # \'sparc64\', \'tricore\', \'unicore32\', \'x86_64\', \'xtensa\', \'xtensaeb\', \'\']"
+                        if 'platform' in template:
+                            if template['platform'] is None:
+                                template.pop('platform')
 
                     templates.append(template)
 
@@ -422,7 +432,7 @@ def main():
                                         raise ProxyError()
                                 else:
                                     print("#### Deleted template id %s on server: %s"
-                                          % (target_template_id_to_delete['template-id'], target_server_address))
+                                          % (target_template_id_to_delete['template_id'], target_server_address))
                             else:
                                 logger.fatal(
                                     "Template id: %s already exists on server %s. Use --force to overwrite it"
@@ -442,7 +452,7 @@ def main():
                             logger.fatal("Forbidden to import template on target server.")
                             raise ProxyError()
                         else:
-                            logger.fatal("Unable to import template on target server.")
+                            logger.fatal("Unable to import template on target server. Response: %s " % r.content)
                             raise ProxyError()
                     else:
                         print("#### Template %s replicated from server: %s to server: %s"

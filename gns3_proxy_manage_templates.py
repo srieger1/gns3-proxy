@@ -22,7 +22,7 @@ from packaging import version
 
 import requests
 
-VERSION = (0, 2)
+VERSION = (0, 3)
 __version__ = '.'.join(map(str, VERSION[0:2]))
 __description__ = 'GNS3 Proxy Manage Images'
 __author__ = 'Sebastian Rieger'
@@ -284,7 +284,6 @@ def main():
                             url = base_dst_api_url + '/appliances'
                         r = requests.get(url, auth=(username, password))
                         if r.status_code == 200:
-                            template_exists = False
                             template_results = json.loads(r.text)
                             for template in template_results:
 
@@ -337,6 +336,9 @@ def main():
                                             elif template['node_type'] == "dynamips":
                                                 for router_node in settings_results['Dynamips']['routers']:
                                                     if router_node['name'] == template['name']:
+                                                        # 'chassis' and 'iomem' not supported in GNS3 >=2.2
+                                                        router_node.pop('chassis', None)
+                                                        router_node.pop('iomem', None)
                                                         template.update(router_node)
 
                                             elif template['node_type'] == "iou":
@@ -347,6 +349,7 @@ def main():
                                             elif template['node_type'] == "qemu":
                                                 for vm_node in settings_results['Qemu']['vms']:
                                                     if vm_node['name'] == template['name']:
+                                                        # 'acpi_shutdown' not supported in GNS3 >=2.2
                                                         vm_node.pop('acpi_shutdown', None)
                                                         template.update(vm_node)
 
@@ -380,8 +383,22 @@ def main():
 
                                         # old <2.2 GNS3 API used appliance_id and node_type, needs to be
                                         # converted to be able to import template to 2.2
+
+                                        # 'appliance_id' is now 'template_id' in GNS3 2.2
+                                        # 'node_type' is now 'template_type' in GNS3 2.2
                                         template['template_id'] = template.pop('appliance_id')
                                         template['template_type'] = template.pop('node_type')
+
+                                        # platform could be null is old GNS3 2.1 templates, GNS3 2.2 only allows the
+                                        # following:
+                                        # None is not one of [\'aarch64\', \'alpha\', \'arm\', \'cris\', \'i386\',
+                                        # \'lm32\', \'m68k\', \'microblaze\', \'microblazeel\', \'mips\', \'mips64\',
+                                        # \'mips64el\', \'mipsel\', \'moxie\', \'or32\', \'ppc\', \'ppc64\', \'ppcemb\',
+                                        # \'s390x\', \'sh4\', \'sh4eb\', \'sparc\', \'sparc64\', \'tricore\',
+                                        # \'unicore32\', \'x86_64\', \'xtensa\', \'xtensaeb\', \'\']"
+                                        if 'platform' in template:
+                                            if template['platform'] is None:
+                                                template.pop('platform')
 
                                     with open(os.path.join(args.export_to_dir, filename), 'w',
                                               encoding="utf8") as outfile:
@@ -461,7 +478,8 @@ def main():
                                     logger.fatal("Forbidden to import template on target server.")
                                     raise ProxyError()
                                 else:
-                                    logger.fatal("Unable to import template on target server.")
+                                    logger.fatal(
+                                        "Unable to import template on target server. Response: %s " % r.content)
                                     raise ProxyError()
                             else:
                                 print("#### Template %s imported from file: %s on server: %s"
