@@ -18,6 +18,7 @@ import sys
 import os
 import time
 from ipaddress import ip_address
+from tqdm import tqdm
 
 import requests
 
@@ -187,8 +188,9 @@ def main():
                         if r.status_code == 200:
                             image_results = json.loads(r.text)
                             for image in image_results:
-                                print("#### Server: %s, Image: %s"
-                                      % (server, image))
+                                if re.fullmatch(args.image_filename, image['filename']):
+                                    print("#### Server: %s, Image: %s"
+                                          % (server, image))
                         else:
                             logger.fatal("Could not get status of images from.")
                             raise ProxyError()
@@ -207,13 +209,18 @@ def main():
                                                  % (image['filename'], server))
 
                                     filename = str(server) + "_" + time.strftime("%Y%m%d-%H%M%S") + image['filename']
+                                    logger.info("Downloading image %s to file %s " % (image['filename'], filename))
                                     url = base_dst_api_url + IMAGE_BACKEND_URL + '/' + image['filename']
                                     r = requests.get(url, auth=(username, password), stream=True)
-                                    with open(os.path.join(args.export_to_dir, filename), 'wb', args.buffer) \
-                                            as outfile:
-                                        for chunk in r.iter_content(chunk_size=args.buffer):
-                                            if chunk:
-                                                outfile.write(chunk)
+                                    total_length = int(r.headers.get('content-length'))
+                                    with tqdm(total=total_length, unit_scale=True, dynamic_ncols=True, unit='B',
+                                              desc="Downloading: ", ascii=True) as pbar:
+                                        with open(os.path.join(args.export_to_dir, filename), 'wb', args.buffer) \
+                                                as outfile:
+                                            for chunk in tqdm(r.iter_content(chunk_size=args.buffer)):
+                                                if chunk:
+                                                    outfile.write(chunk)
+                                                    pbar.update(args.buffer)
 
                                     print("#### Exported image %s from server: %s to file: "
                                           % (image['filename'], config_servers[server]),
@@ -276,18 +283,19 @@ def main():
                             url = base_dst_api_url + ALT_IMAGE_BACKEND_URL + '/' + args.image_filename
                             # files = {'file': open(args.import_from_file, 'rb', args.buffer)}
                             # r = requests.post(url, files=files, auth=(username, password))
+                            total_length=os.stat(filename).st_size
                             with open(args.import_from_file, 'rb', args.buffer) as f:
                                 r = requests.post(url, auth=(username, password), data=f)
-                            if not r.status_code == 200:
-                                if r.status_code == 403:
-                                    logger.fatal("Forbidden to import image on target server.")
-                                    raise ProxyError()
+                                if not r.status_code == 200:
+                                    if r.status_code == 403:
+                                        logger.fatal("Forbidden to import image on target server.")
+                                        raise ProxyError()
+                                    else:
+                                        logger.fatal("Unable to import image on target server.")
+                                        raise ProxyError()
                                 else:
-                                    logger.fatal("Unable to import image on target server.")
-                                    raise ProxyError()
-                            else:
-                                print("#### image %s imported from file: %s on server: %s"
-                                      % (args.image_filename, args.import_from_file, server))
+                                    print("#### image %s imported from file: %s on server: %s"
+                                          % (args.image_filename, args.import_from_file, server))
                         else:
                             logger.fatal("Could not get status of images from server %s." % config_servers[server])
                             raise ProxyError()
