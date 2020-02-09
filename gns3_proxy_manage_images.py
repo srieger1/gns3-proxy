@@ -18,7 +18,6 @@ import sys
 import os
 import time
 from ipaddress import ip_address
-from tqdm import tqdm
 
 import requests
 
@@ -50,6 +49,8 @@ DEFAULT_CONFIG_FILE = 'gns3_proxy_config.ini'
 DEFAULT_LOG_LEVEL = 'INFO'
 DEFAULT_SHOW_ACTION = False
 DEFAULT_FORCE = False
+
+# TODO: add support for non-qemu images
 
 # Compute Image Backend
 IMAGE_BACKEND_URL = '/compute/qemu/images'
@@ -213,14 +214,34 @@ def main():
                                     url = base_dst_api_url + IMAGE_BACKEND_URL + '/' + image['filename']
                                     r = requests.get(url, auth=(username, password), stream=True)
                                     total_length = int(r.headers.get('content-length'))
-                                    with tqdm(total=total_length, unit_scale=True, dynamic_ncols=True, unit='B',
-                                              desc="Downloading: ", ascii=True) as pbar:
-                                        with open(os.path.join(args.export_to_dir, filename), 'wb', args.buffer) \
-                                                as outfile:
-                                            for chunk in tqdm(r.iter_content(chunk_size=args.buffer)):
-                                                if chunk:
-                                                    outfile.write(chunk)
-                                                    pbar.update(args.buffer)
+                                    transferred_length = 0
+                                    prev_transferred_length = 0
+                                    next_percentage_to_print = 0
+                                    prev_timestamp = int(round(time.time() * 1000))
+                                    with open(os.path.join(args.export_to_dir, filename), 'wb', args.buffer) \
+                                            as outfile:
+                                        for chunk in r.iter_content(chunk_size=args.buffer):
+                                            if chunk:
+                                                outfile.write(chunk)
+                                                transferred_length += len(chunk)
+                                                if total_length > 0:
+                                                    transferred_percentage = int(
+                                                        (transferred_length / total_length) * 100)
+                                                else:
+                                                    transferred_percentage = 0
+                                                if transferred_percentage >= next_percentage_to_print:
+                                                    curr_timestamp = int(round(time.time() * 1000))
+                                                    duration = curr_timestamp - prev_timestamp
+                                                    delta_length = transferred_length - prev_transferred_length
+                                                    if duration > 0:
+                                                        rate = delta_length / (duration / 1000)
+                                                    else:
+                                                        rate = 0
+                                                    prev_timestamp = curr_timestamp
+                                                    prev_transferred_length = transferred_length
+                                                    print("Downloading ... %d%% (%.3f MB/s)" %
+                                                          (transferred_percentage, (rate/1000000)))
+                                                    next_percentage_to_print = next_percentage_to_print + 5
 
                                     print("#### Exported image %s from server: %s to file: "
                                           % (image['filename'], config_servers[server]),
@@ -231,7 +252,7 @@ def main():
                             raise ProxyError()
 
                     if args.import_from_file:
-                        print("#### Importing image %s on server: %s" % (args.image_filename, server))
+                        print("#### Importing image %s on server: %s" % (args.import_from_file, server))
 
                         logger.debug("Checking if target image exists...")
                         url = base_dst_api_url + IMAGE_BACKEND_URL
@@ -241,14 +262,14 @@ def main():
                             image_to_delete = ''
                             image_results = json.loads(r.text)
                             for image in image_results:
-                                if re.fullmatch(args.image_filename, image['filename']):
+                                if re.fullmatch(args.import_from_file, image['filename']):
                                     logger.debug("image: %s already exists on server %s"
                                                  % (image['filename'], server))
                                     if image_exists:
                                         logger.fatal(
                                             "Multiple images matched %s on server %s. "
                                             "Import can only be used for single image." % (
-                                                args.image_filename, config_servers[
+                                                args.import_from_file, config_servers[
                                                     server]))
                                         raise ProxyError()
                                     else:
@@ -270,22 +291,54 @@ def main():
                                     #        raise ProxyError()
                                     logger.debug(
                                         "image: %s (%s) already exists on server %s. Overwriting it."
-                                        % (args.image_filename, image_to_delete, server))
+                                        % (args.import_from_file, image_to_delete, server))
                                 else:
                                     logger.fatal(
                                         "image: %s (%s) already exists on server %s. Use --force to overwrite it"
                                         " during import."
-                                        % (args.image_filename, image_to_delete, server))
+                                        % (args.import_from_file, image_to_delete, server))
                                     raise ProxyError()
 
                             logger.debug("Importing image")
                             # import image
-                            url = base_dst_api_url + ALT_IMAGE_BACKEND_URL + '/' + args.image_filename
+                            url = base_dst_api_url + ALT_IMAGE_BACKEND_URL + '/' + args.import_from_file
                             # files = {'file': open(args.import_from_file, 'rb', args.buffer)}
                             # r = requests.post(url, files=files, auth=(username, password))
-                            total_length=os.stat(filename).st_size
-                            with open(args.import_from_file, 'rb', args.buffer) as f:
-                                r = requests.post(url, auth=(username, password), data=f)
+                            total_length = os.stat(args.import_from_file).st_size
+                            with open(args.import_from_file, 'rb', args.buffer) as infile:
+                                # r = requests.post(url, auth=(username, password), data=f)
+
+                                def generate_chunk():
+                                    transferred_length_upload = 0
+                                    prev_transferred_length_upload = 0
+                                    next_percentage_to_print_upload = 0
+                                    prev_timestamp_upload = int(round(time.time() * 1000))
+                                    while True:
+                                        in_chunk = infile.read(args.buffer)
+                                        if not in_chunk:
+                                            break
+                                        yield in_chunk
+                                        transferred_length_upload += len(in_chunk)
+                                        if total_length > 0:
+                                            transferred_percentage_upload = int((transferred_length_upload / total_length) * 100)
+                                        else:
+                                            transferred_percentage_upload = 0
+                                        if transferred_percentage_upload >= next_percentage_to_print_upload:
+                                            curr_timestamp_upload = int(round(time.time() * 1000))
+                                            duration_upload = curr_timestamp_upload - prev_timestamp_upload
+                                            delta_length_upload = \
+                                                transferred_length_upload - prev_transferred_length_upload
+                                            if duration_upload > 0:
+                                                rate_upload = delta_length_upload / (duration_upload / 1000)
+                                            else:
+                                                rate_upload = 0
+                                            prev_timestamp_upload = curr_timestamp_upload
+                                            prev_transferred_length_upload = transferred_length_upload
+                                            print("Uploading ... %d%% (%.3f MB/s)" %
+                                                  (transferred_percentage_upload, (rate_upload / 1000000)))
+                                            next_percentage_to_print_upload = next_percentage_to_print_upload + 5
+
+                                r = requests.post(url, auth=(username, password), data=generate_chunk())
                                 if not r.status_code == 200:
                                     if r.status_code == 403:
                                         logger.fatal("Forbidden to import image on target server.")
@@ -295,7 +348,7 @@ def main():
                                         raise ProxyError()
                                 else:
                                     print("#### image %s imported from file: %s on server: %s"
-                                          % (args.image_filename, args.import_from_file, server))
+                                          % (args.import_from_file, args.import_from_file, server))
                         else:
                             logger.fatal("Could not get status of images from server %s." % config_servers[server])
                             raise ProxyError()

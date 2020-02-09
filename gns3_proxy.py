@@ -17,6 +17,7 @@
 # TODO: add logging/auditing, monitoring of load etc. (current open connections)
 # TODO: integrate proxy.py updates, e.g., multi processing?
 # TODO: code refactoring/removing unused proxy.py code
+# TODO: evaluate reimplementing gns3_proxy as a plugin for proxy.py instead of stand-alone
 
 # TODO: show proxy errors (e.g., console_host misconfiguration) explicitly in GNS3 GUI - if possible?
 # TODO: web interface for manual replication and start/stop
@@ -26,6 +27,8 @@
 # TODO: LDAP integration for user login? Would require SSL connection to server which was dropped for GNS3 2.x, if
 #       we tackle this, also authentication for console access could be addressed (e.g., using websockify instead of
 #       telnet, using Auth or Token as in VIRL)
+
+# TODO: Remove duplicate code fragments, esp. in gns3_proxy tools
 
 import argparse
 import os

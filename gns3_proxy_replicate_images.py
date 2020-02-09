@@ -17,6 +17,7 @@ import re
 import shutil
 import sys
 import tempfile
+import time
 from ipaddress import ip_address
 
 import requests
@@ -80,10 +81,6 @@ def parse_args(args):
     parser.add_argument('--image-filename', type=str, required=True,
                         help='Name of the image to be replicated.'
                              'Can be specified as a regular expression to match multiple images.')
-
-    parser.add_argument('--tempfile-dir', type=str, required=False, default=None,
-                        help='Create temporary files in the referenced directory. If the option is not used,'
-                             'the default tmp directory of the system will be used.')
 
     parser.add_argument('--buffer', type=int, required=False, default=8192,
                         help='Number of bytes to use for buffering download and upload of images.')
@@ -191,25 +188,12 @@ def main():
 
         for image in images:
             image_filename = image['filename']
-            print("#### Replicating image: %s" % image_filename)
-            tmp_file = tempfile.TemporaryFile(buffering=args.buffer, dir=args.tempfile_dir)
-
-            # export source image
-            logger.debug("Exporting source image")
-            url = base_src_api_url + IMAGE_BACKEND_URL + '/' + image_filename
-            r = requests.get(url, stream=True, auth=(username, password))
-            if r.status_code == 200:
-                r.raw.decode_content = True
-                shutil.copyfileobj(r.raw, tmp_file)
-                logger.debug("Image exported to file: %s" % tmp_file.name)
-            else:
-                logger.fatal("Unable to export image from source server.")
-                raise ProxyError()
+            print("#### Replicating image: %s from server: %s (%s)" % (image_filename, args.source_server, src_server))
 
             # target handling
 
             # Try to find match for target server in config
-            target_server_addresses = list()
+            target_servers = list()
             if len(config_servers) > 0:
                 for key in config_servers:
                     if re.fullmatch(args.target_server, key):
@@ -220,18 +204,20 @@ def main():
                             logger.debug("Target server %s is the same as the source server %s . Filtered out."
                                          % (key, args.source_server))
                         else:
-                            target_server_addresses.append(config_servers[key])
+                            target_servers.append({'name': key, 'address': config_servers[key]})
             else:
                 logger.fatal("No servers defined in config. Could not select target server.")
                 raise ProxyError()
 
-            if len(target_server_addresses) == 0:
+            if len(target_servers) == 0:
                 logger.fatal("No target servers found using match: %s. Could not select target server."
                              % args.target_server)
                 raise ProxyError()
 
-            for target_server_address in target_server_addresses:
-                logger.debug("    #### Replicating image: %s to server: %s" % (image_filename, target_server_address))
+            for target_server in target_servers:
+                target_server_name = target_server['name']
+                target_server_address = target_server['address']
+                logger.debug("    Replicating image: %s to server: %s" % (image_filename, target_server_name))
                 base_dst_api_url = "http://" + target_server_address + ":" + str(backend_port) + "/v2"
 
                 logger.debug("Checking if target image exists...")
@@ -244,12 +230,12 @@ def main():
                     for target_image in target_image_results:
                         if re.fullmatch(image_filename, target_image['filename']):
                             logger.debug("image: %s already exists on server %s"
-                                         % (target_image['filename'], target_server_address))
+                                         % (target_image['filename'], target_server_name))
                             if target_image_exists:
                                 logger.fatal(
                                     "Multiple images matched %s on server %s. "
                                     "Import can only be used for single image." % (
-                                        image_filename, target_server_address))
+                                        image_filename, target_server_name))
                                 raise ProxyError()
                             else:
                                 target_image_exists = True
@@ -270,37 +256,71 @@ def main():
                             #        raise ProxyError()
                             logger.debug(
                                 "image: %s (%s) already exists on server %s. Overwriting it."
-                                % (image_filename, target_image_to_delete, target_server_address))
+                                % (image_filename, target_image_to_delete, target_server_name))
                         else:
                             logger.fatal(
                                 "image: %s (%s) already exists on server %s. Use --force to overwrite it"
                                 " during import."
-                                % (image_filename, target_image_to_delete, target_server_address))
+                                % (image_filename, target_image_to_delete, target_server_name))
                             raise ProxyError()
 
-                    logger.debug("Importing image")
-                    # import image
+                    # export source image
+                    logger.debug("Opening source image")
+                    url = base_src_api_url + IMAGE_BACKEND_URL + '/' + image_filename
+                    r_export = requests.get(url, stream=True, auth=(username, password))
+                    if not r_export.status_code == 200:
+                        logger.fatal("Unable to export image from source server.")
+                        raise ProxyError()
+
+                    def generate_chunk():
+                        transferred_length_upload = 0
+                        prev_transferred_length_upload = 0
+                        next_percentage_to_print_upload = 0
+                        prev_timestamp_upload = int(round(time.time() * 1000))
+                        for in_chunk in r_export.iter_content(chunk_size=args.buffer):
+                            if in_chunk:
+                                yield in_chunk
+                                transferred_length_upload += len(in_chunk)
+                                if total_length > 0:
+                                    transferred_percentage_upload = int(
+                                        (transferred_length_upload / total_length) * 100)
+                                else:
+                                    transferred_percentage_upload = 0
+                                if transferred_percentage_upload >= next_percentage_to_print_upload:
+                                    curr_timestamp_upload = int(round(time.time() * 1000))
+                                    duration_upload = curr_timestamp_upload - prev_timestamp_upload
+                                    delta_length_upload = \
+                                        transferred_length_upload - prev_transferred_length_upload
+                                    if duration_upload > 0:
+                                        rate_upload = delta_length_upload / (duration_upload / 1000)
+                                    else:
+                                        rate_upload = 0
+                                    prev_timestamp_upload = curr_timestamp_upload
+                                    prev_transferred_length_upload = transferred_length_upload
+                                    print("Replicating to %s (%s) ... %d%% (%.3f MB/s)" %
+                                          (target_server_name, target_server_address, transferred_percentage_upload,
+                                           (rate_upload / 1000000)))
+                                    next_percentage_to_print_upload = next_percentage_to_print_upload + 5
+
+                    # import target image
+                    logger.debug("Opening target image")
                     url = base_dst_api_url + ALT_IMAGE_BACKEND_URL + '/' + image_filename
-                    tmp_file.seek(0)
-                    #files = {'file': tmp_file}
-                    #r = requests.post(url, files=files, auth=(username, password))
-                    r = requests.post(url, auth=(username, password), data=tmp_file)
-                    if not r.status_code == 200:
-                        if r.status_code == 403:
+                    total_length = int(r_export.headers.get('content-length'))
+                    r_import = requests.post(url, auth=(username, password), data=generate_chunk())
+                    if not r_import.status_code == 200:
+                        if r_import.status_code == 403:
                             logger.fatal("Forbidden to import image on target server.")
                             raise ProxyError()
                         else:
                             logger.fatal("Unable to import image on target server.")
                             raise ProxyError()
                     else:
-                        print("    #### image %s replicated from server: %s to server: %s"
-                              % (image_filename, src_server, target_server_address))
-                else:
-                    logger.fatal("Could not get status of images from server %s." % target_server_address)
-                    raise ProxyError()
+                        print("#### image %s replicated from server: %s to server: %s"
+                              % (image_filename, args.source_server, target_server_name))
 
-            # image is replicated close temp file
-            tmp_file.close()
+                else:
+                    logger.fatal("Could not get status of images from server %s." % target_server_name)
+                    raise ProxyError()
 
         print("Done.")
 
