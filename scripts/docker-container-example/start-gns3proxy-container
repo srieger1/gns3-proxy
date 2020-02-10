@@ -1,3 +1,8 @@
 #!/bin/bash
-#docker run -itd --name gns3proxy -v $(pwd)/gns3_proxy_config.ini:/home/gns3_proxy/gns3_proxy_config.ini:ro -v $(pwd)/gns3_proxy_crontab:/var/spool/cron/crontabs/gns3_proxy:ro -p 0.0.0.0:14080:14080/tcp flex/gns3-proxy
-docker run --restart=always -itd --name gns3proxy -v /opt/gns3/images:/opt/gns3/images -v $(pwd)/gns3_proxy_config.ini:/home/gns3_proxy/gns3_proxy_config.ini:ro -v $(pwd)/gns3_proxy_crontab:/var/spool/cron/crontabs/gns3_proxy:ro -p 0.0.0.0:14080:14080/tcp flex/gns3-proxy
+if [ -d "/opt/gns3" ]; then
+  echo "Starting GNS3 Proxy. Host seems to have GNS3 installed. Mounting /opt/gns3 to allow image im-/export etc."
+  docker run --restart=always -itd --name gns3proxy -v /opt/gns3:/opt/gns3 -v $(pwd)/gns3_proxy_config.ini:/home/gns3_proxy/gns3_proxy_config.ini:ro -v $(pwd)/gns3_proxy_crontab:/var/spool/cron/crontabs/gns3_proxy:ro -p 0.0.0.0:14080:14080/tcp flex/gns3-proxy
+else
+  echo "Starting GNS3 Proxy."
+  docker run --restart=always -itd --name gns3proxy -v $(pwd)/gns3_proxy_config.ini:/home/gns3_proxy/gns3_proxy_config.ini:ro -v $(pwd)/gns3_proxy_crontab:/var/spool/cron/crontabs/gns3_proxy:ro -p 0.0.0.0:14080:14080/tcp flex/gns3-proxy
+fi
