@@ -764,7 +764,7 @@ class Proxy(threading.Thread):
             # to work with the proxy (i.e., consoles not being accessible)
             if b'x-route' in self.response.headers:
                 if self.response.headers[b'x-route'][1].lower() == b'/v2/projects/{project_id}/nodes':
-                    logger.debug("Checking console_hsot in response for %s", self.response.headers[b'x-route'])
+                    logger.debug("Checking console_host in response for %s", self.response.headers[b'x-route'])
                     if data.find(b"\"console_host\": \"0.0.0.0\",") != -1:
                         logger.fatal("Backend %s is likely to be misconfigured! In gns3_server.conf host needs to be"
                                      "changed to the primary IP address also used in the backend config. Seems to be"
