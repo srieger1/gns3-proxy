@@ -14,15 +14,13 @@ import configparser
 import json
 import logging
 import re
-import shutil
 import sys
-import tempfile
 import time
 from ipaddress import ip_address
 
 import requests
 
-VERSION = (0, 2)
+VERSION = (0, 3)
 __version__ = '.'.join(map(str, VERSION[0:2]))
 __description__ = 'GNS3 Proxy Replicate Images'
 __author__ = 'Sebastian Rieger'
@@ -49,6 +47,8 @@ if PY3:  # pragma: no cover
 DEFAULT_CONFIG_FILE = 'gns3_proxy_config.ini'
 DEFAULT_LOG_LEVEL = 'INFO'
 DEFAULT_FORCE = False
+
+# TODO: add support for non-qemu images
 
 # Compute Image Backend
 IMAGE_BACKEND_URL = '/compute/qemu/images'

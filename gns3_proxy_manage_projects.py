@@ -169,6 +169,7 @@ def main():
 
         # Try to find match for target server in config
         if len(config_servers) > 0:
+            base_dst_api_url = None
             for server in config_servers:
                 if re.fullmatch(args.target_server, server):
                     logger.debug("Target server found: %s (%s) using provided match: %s" % (server,
@@ -368,6 +369,10 @@ def main():
                                 if not r.status_code == 201:
                                     logger.fatal("Unable to close project. Project does not exist or is corrupted?")
                                     raise ProxyError()
+
+            if base_dst_api_url is None:
+                logger.fatal("Could not find target server %s." % args.target_server)
+                raise ProxyError()
 
         print("Done.")
 
