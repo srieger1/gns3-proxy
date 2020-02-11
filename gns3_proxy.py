@@ -12,8 +12,9 @@
 """
 
 # TODO: override server backend for user, e.g., using username@backend as user
-# TODO: modification of requests/responses on-the-fly, e.g., to change advertised GNS3 server version?,
-#       or display only certain projects for each user
+# TODO: modification of requests/responses on-the-fly, e.g., to change advertised GNS3 server version? (faking GNS3
+#       client or server version seems risky as API is not necessarily backward compatible, e.g., massive changes from
+#       2.1 to 2.2)
 # TODO: add logging/auditing, monitoring of load etc. (current open connections)
 # TODO: integrate proxy.py updates, e.g., multi processing?
 # TODO: code refactoring/removing unused proxy.py code
@@ -45,6 +46,7 @@ import configparser
 import re
 import time
 from ipaddress import ip_address
+import json
 
 if os.name != 'nt':
     import resource
@@ -503,7 +505,7 @@ class Proxy(threading.Thread):
 
     def __init__(self, client, backend_auth_code=None, backend_port=3080, server_recvbuf_size=8192,
                  client_recvbuf_size=8192, default_server=None, config_servers=None,
-                 config_users=None, config_mapping=None, config_deny=None):
+                 config_users=None, config_mapping=None, config_project_filter=None, config_deny=None):
         super(Proxy, self).__init__()
 
         self.start_time = self._now()
@@ -521,6 +523,7 @@ class Proxy(threading.Thread):
         self.config_servers = config_servers
         self.config_users = config_users
         self.config_mapping = config_mapping
+        self.config_project_filter = config_project_filter
         self.config_deny = config_deny
 
         self.request = HttpParser(HttpParser.types.REQUEST_PARSER)
@@ -706,11 +709,62 @@ class Proxy(threading.Thread):
         # parse incoming response packet
         # only for non-https requests
         if not self.request.method == b'CONNECT':
+
+            # modification to data are only possible before response data is parsed
+
+            # filter project list
+            if self.config_project_filter is not None:
+                if data.find(b'X-Route: /v2/projects\r\n') != -1:
+                    logger.debug("Filtering project library in response")
+                    user_matched = False
+                    user_project_filters = list()
+                    for project_filter in self.config_project_filter:
+                        if re.fullmatch(project_filter["match"], self.username):
+                            logger.debug("Project filter %s matched for user %s" % (project_filter["match"],
+                                                                                    self.username))
+                            user_matched = True
+                            user_project_filters.append(project_filter)
+
+                    if user_matched:
+                        header_block = data[:data.find(b'\r\n\r\n')]
+                        body = data[data.find(b'\r\n\r\n'):]
+
+                        try:
+                            projects = json.loads(body)
+                            projects_filtered = list()
+
+                            for user_project_filter in user_project_filters:
+                                for project in projects:
+                                    if re.fullmatch(user_project_filter["filter"], project["name"]):
+                                        logger.debug("Allowing project %s for user %s" % (project, self.username))
+                                        if project not in projects_filtered:
+                                            projects_filtered.append(project)
+
+                            logger.info("Filtered project library for user %s from %d to %d entries.",
+                                        self.username, len(projects), len(projects_filtered))
+
+                            body = json.dumps(projects_filtered)
+                            header_block_out = b''
+                            for header in header_block.split(CRLF):
+                                if text_(header).startswith("Content-Length:"):
+                                    header_block_out += bytes_("Content-Length: " + str(len(body))) + CRLF
+                                else:
+                                    header_block_out += header + CRLF
+
+                            new_data = bytes_(header_block_out) + b'\r\n' + bytes_(body)
+                            data = new_data
+                        except json.decoder.JSONDecodeError:
+                            logger.error("JSONDecodeError during project filtering. %s", body)
+
+
+            # parse data, no modification to data possible beyond this point
             self.response.parse(data)
 
+            # check console_host config in project nodes, if value is "0.0.0.0" backend is likely not setup correctly
+            # to work with the proxy (i.e., consoles not being accessible)
             if b'x-route' in self.response.headers:
                 if self.response.headers[b'x-route'][1].lower() == b'/v2/projects/{project_id}/nodes':
-                    logger.info("%s", self.response.headers[b'x-route'])
+                    logger.debug("Checking console_hsot in response for %s", self.response.headers[b'x-route'])
                     if data.find(b"\"console_host\": \"0.0.0.0\",") != -1:
                         logger.fatal("Backend %s is likely to be misconfigured! In gns3_server.conf host needs to be"
                                      "changed to the primary IP address also used in the backend config. Seems to be"
@@ -721,6 +775,11 @@ class Proxy(threading.Thread):
                     # data = data.replace(b"\"console_host\": \"0.0.0.0\",", b"\"console_host\": \"192.168.76.205\",")
                     # data = data.replace(b"\"console_host\": \"0.0.0.0\",", b"\"console_host\": \"0.0.0.0\",")
                     # logger.info("%s", data)
+
+            # demo to intercept specific response
+            #if b'x-route' in self.response.headers:
+            #    if self.response.headers[b'x-route'][1].lower() == b'/v2/settings':
+            #        logger.info("%s", self.response.headers[b'x-route'])
 
             # GNS3 Proxy Example to rewrite response content
             #
@@ -885,7 +944,7 @@ class HTTP(TCP):
     def __init__(self, hostname='127.0.0.1', port=13080, backlog=100,
                  backend_auth_code=None, backend_port=3080, server_recvbuf_size=8192, client_recvbuf_size=8192,
                  default_server=None, config_servers=None, config_users=None, config_mapping=None,
-                 config_deny=None):
+                 config_project_filter=None, config_deny=None):
         super(HTTP, self).__init__(hostname, port, backlog)
         self.client_recvbuf_size = client_recvbuf_size
         self.server_recvbuf_size = server_recvbuf_size
@@ -896,6 +955,7 @@ class HTTP(TCP):
         self.config_servers = config_servers
         self.config_users = config_users
         self.config_mapping = config_mapping
+        self.config_project_filter = config_project_filter
         self.config_deny = config_deny
 
     def handle(self, client):
@@ -908,6 +968,7 @@ class HTTP(TCP):
                       config_servers=self.config_servers,
                       config_users=self.config_users,
                       config_mapping=self.config_mapping,
+                      config_project_filter=self.config_project_filter,
                       config_deny=self.config_deny)
         proxy.daemon = True
         proxy.start()
@@ -1098,6 +1159,30 @@ def main():
     else:
         config_mapping = None
 
+    # read project filter from config
+    if config.items('project-filter'):
+        config_project_filter = list()
+        project_filter_items = config.items('project-filter')
+        for key, value in project_filter_items:
+            # project-filter line must be in format "<user match>":"<filter>", e.g.:
+            #   "user(.*)":"(.*)Group1(.*)"
+            #   "user2":"Test Lab"
+
+            # temporarily replace escaped quotation marks to preserve them
+            # tempvalue = str(value).replace("\"","'")
+            if not re.fullmatch("^\"([^\"]*)\":\"([^\"]*)\"$", value):
+                logger.fatal(
+                    "project-filter config not valid. Line %s is not in format \"<user match>\":\"<filter>\"" % value)
+                raise ProxyError()
+            # cut off quotation mark at beginning and end of line and split components
+            project_filter_value = str(value[1:-1]).split("\":\"")
+            logger.debug("config project-filter value %s" % project_filter_value)
+            project_filter_match = project_filter_value[0]
+            project_filter_filter = project_filter_value[1]
+            config_project_filter.append({"match": project_filter_match, "filter": project_filter_filter})
+    else:
+        config_project_filter = None
+
     # read deny from config
     if config.items('deny'):
         config_deny = list()
@@ -1143,6 +1228,7 @@ def main():
     logger.debug("Config servers: %s" % config_servers)
     logger.debug("Config users: %s" % config_users)
     logger.debug("Config mapping: %s" % config_mapping)
+    logger.debug("Config project-filter: %s" % config_project_filter)
     logger.debug("Config deny: %s" % config_deny)
 
     try:
@@ -1159,6 +1245,7 @@ def main():
                      config_servers=config_servers,
                      config_users=config_users,
                      config_mapping=config_mapping,
+                     config_project_filter=config_project_filter,
                      config_deny=config_deny)
         proxy.run()
     except KeyboardInterrupt:
