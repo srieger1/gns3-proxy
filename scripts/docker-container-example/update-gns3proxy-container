@@ -1,2 +1,10 @@
 #!/bin/bash
+if [ ! -f "./gns3_proxy_config.ini" ]; then
+  wget https://raw.githubusercontent.com/srieger1/gns3-proxy/develop/gns3_proxy_config.ini
+fi
+
+if [ ! -f "./gns3_proxy_crontab" ]; then
+  wget https://raw.githubusercontent.com/srieger1/gns3-proxy/develop/gns3_proxy_crontab
+fi
+
 docker pull flex/gns3-proxy

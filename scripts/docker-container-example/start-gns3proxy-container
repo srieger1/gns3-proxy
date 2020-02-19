@@ -1,4 +1,14 @@
 #!/bin/bash
+if [ ! -f "./gns3_proxy_config.ini" ]; then
+  echo "gns3_proxy_config.ini is missing in current directory. It is necessary to mount a persistent config file in the container. You can use update-gns3proxy-container to download an initial configuration."
+  exit 1
+fi
+
+if [ ! -f "./gns3_proxy_crontab" ]; then
+  echo "gns3_proxy_crontab is missing in current directory. It is necessary to mount a persistent config file in the container. You can use update-gns3proxy-container to download an initial configuration."
+  exit 1
+fi
+
 if [ -d "/opt/gns3" ]; then
   echo "Starting GNS3 Proxy. Host seems to have GNS3 installed. Mounting /opt/gns3 to allow image im-/export etc."
   docker run --restart=always -itd --name gns3proxy -v /opt/gns3:/opt/gns3 -v $(pwd)/gns3_proxy_config.ini:/home/gns3_proxy/gns3_proxy_config.ini:ro -v $(pwd)/gns3_proxy_crontab:/var/spool/cron/crontabs/gns3_proxy:ro -p 0.0.0.0:14080:14080/tcp flex/gns3-proxy
