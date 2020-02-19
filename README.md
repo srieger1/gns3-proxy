@@ -79,8 +79,10 @@ from Docker Hub, e.g., using
 
 `$ docker run -p 0.0.0.0:14080:14080/tcp flex/gns3-proxy`
 
-You can also use a [bootstrap script](https://github.com/srieger1/gns3-proxy/tree/develop/scripts/bootstrap-gns3-proxy-container) to install the [sample scripts](https://github.com/srieger1/gns3-proxy/tree/develop/scripts/docker-container-example)
-to run and manage the container provided in this repository.
+You can use a [bootstrap script](https://github.com/srieger1/gns3-proxy/tree/develop/scripts/bootstrap-gns3-proxy-container) to install the [sample scripts](https://github.com/srieger1/gns3-proxy/tree/develop/scripts/docker-container-example)
+, pull the container image an run it:
+
+`$ bash <(curl -s https://raw.githubusercontent.com/srieger1/gns3-proxy/develop/scripts/docker-container-example/bootstrap-gns3-proxy-container)`
 
 Also, you can install the gns3-proxy from [PyPI](https://pypi.org/project/gns3-proxy/) using
 
