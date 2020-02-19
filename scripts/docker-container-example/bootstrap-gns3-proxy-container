@@ -1,0 +1,38 @@
+#!/bin/bash
+
+echo "Downloading gns3-proxy example docker container scripts..."
+echo "================================================================================="
+
+wget -q https://raw.githubusercontent.com/srieger1/gns3-proxy/develop/scripts/docker-container-example/login-to-gns3proxy-container
+wget -q https://raw.githubusercontent.com/srieger1/gns3-proxy/develop/scripts/docker-container-example/restart-gns3proxy-container
+wget -q https://raw.githubusercontent.com/srieger1/gns3-proxy/develop/scripts/docker-container-example/show-log-gns3proxy-container
+wget -q https://raw.githubusercontent.com/srieger1/gns3-proxy/develop/scripts/docker-container-example/start-gns3proxy-container
+wget -q https://raw.githubusercontent.com/srieger1/gns3-proxy/develop/scripts/docker-container-example/stop-gns3proxy-container
+wget -q https://raw.githubusercontent.com/srieger1/gns3-proxy/develop/scripts/docker-container-example/update-gns3proxy-container
+
+chmod +x login-to-gns3proxy-container
+chmod +x restart-gns3proxy-container
+chmod +x show-log-gns3proxy-container
+chmod +x start-gns3proxy-container
+chmod +x stop-gns3proxy-container
+chmod +x update-gns3proxy-container
+
+echo "Pulling gns3-proxy docker image..."
+echo "================================================================================="
+
+./update-gns3proxy-container
+
+echo "Starting gns3-proxy container..."
+echo "================================================================================="
+
+./start-gns3proxy-container
+
+echo "Result:"
+echo "================================================================================="
+
+docker ps -a
+
+echo "Login to the container, you can exit the container using 'exit' command."
+echo "================================================================================="
+
+./login-to-gns3proxy-container
