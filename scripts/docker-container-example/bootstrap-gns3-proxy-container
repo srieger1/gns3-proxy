@@ -17,22 +17,41 @@ chmod +x start-gns3proxy-container
 chmod +x stop-gns3proxy-container
 chmod +x update-gns3proxy-container
 
+echo
 echo "Pulling gns3-proxy docker image..."
 echo "================================================================================="
 
 ./update-gns3proxy-container
 
+echo
 echo "Starting gns3-proxy container..."
 echo "================================================================================="
 
 ./start-gns3proxy-container
 
+echo
 echo "Result:"
 echo "================================================================================="
 
 docker ps -a
 
-echo "Login to the container, you can exit the container using 'exit' command."
-echo "================================================================================="
+#echo "Login to the container, you can exit the container using 'exit' command."
+#echo "================================================================================="
+# ./login-to-gns3proxy-container
 
-./login-to-gns3proxy-container
+echo
+echo
+echo
+echo "================================================================================="
+echo
+echo "gns3-proxy container has been successfully installed and started. An initial"
+echo "configuration file was fetched from the repository. It needs to be adapted to"
+echo "your local setup, e.g. using 'nano ./gns3_proxy_config.ini'. After changing the"
+echo "config file, the container needs to be restarted, e.g. using"
+echo "'./restart-gns3proxy-container'. The config, a crontab file and GNS3 related"
+echo "files from /opt/gns3 are mounted in the container to ensure a persistent config."
+echo "To login to the container, you can run './login-to-gns3proxy-container'. To stop"
+echo "and delete the container, you can run './stop-gns3proxy-container'. Further"
+echo "documentation can be found at: https://github.com/srieger1/gns3-proxy"
+echo
+echo "================================================================================="
