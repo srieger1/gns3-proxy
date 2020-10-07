@@ -21,7 +21,7 @@ from ipaddress import ip_address
 
 import requests
 
-VERSION = (0, 3)
+VERSION = (0, 4)
 __version__ = '.'.join(map(str, VERSION[0:2]))
 __description__ = 'GNS3 Proxy Manage Images'
 __author__ = 'Sebastian Rieger'
@@ -50,14 +50,6 @@ DEFAULT_LOG_LEVEL = 'INFO'
 DEFAULT_SHOW_ACTION = False
 DEFAULT_FORCE = False
 
-# TODO: add support for non-qemu images
-
-# Compute Image Backend
-IMAGE_BACKEND_URL = '/compute/qemu/images'
-
-# Alternate location for image access, used for upload by the GNS3 client, but download (GET) throws an error
-ALT_IMAGE_BACKEND_URL = '/computes/local/qemu/images'
-
 
 class ProxyError(Exception):
     pass
@@ -80,8 +72,14 @@ def parse_args(args):
                         help='Force action without further prompt. E.g., delete images without further '
                              'verification.')
 
+    parser.add_argument('--image-type', type=str, required=True, choices=['qemu', 'dynamips', 'iou', 'docker'],
+                        help='Type of the images to be managed.'
+                             'GNS3 currently uses different API for each image type.')
+    # docker is also possible /v2/compute/docker/images, but only to show pulled container
+    # images. They are automatically pulled if not available anyway
+
     parser.add_argument('--image-filename', type=str, required=True,
-                        help='Name of the image to be managed.'
+                        help='Name of the images to be managed.'
                              'Can be specified as a regular expression to match multiple images.')
 
     parser.add_argument('--buffer', type=int, required=False, default=8192,
@@ -170,6 +168,14 @@ def main():
         username = backend_user
         password = backend_password
 
+        print("#### Handling image type %s on server: %s" % (args.image_type, server))
+
+        # Compute Image Backend
+        image_backend_url = '/compute/' + args.image_type + '/images'
+
+        # Alternate location for image access, used for upload by the GNS3 client, but download (GET) throws an error
+        alt_image_backend_url = '/computes/local/' + args.image_type + '/images'
+
         # Try to find match for target server in config
         if len(config_servers) > 0:
             base_dst_api_url = None
@@ -185,12 +191,17 @@ def main():
                         print("#### Showing images on server: %s" % server)
 
                         logger.debug("Getting status of images...")
-                        url = base_dst_api_url + IMAGE_BACKEND_URL
+                        url = base_dst_api_url + image_backend_url
                         r = requests.get(url, auth=(username, password))
                         if r.status_code == 200:
                             image_results = json.loads(r.text)
                             for image in image_results:
-                                if re.fullmatch(args.image_filename, image['filename']):
+                                if args.image_type == 'docker':
+                                    image_name = image['image']
+                                else:
+                                    image_name = image['filename']
+
+                                if re.fullmatch(args.image_filename, image_name):
                                     print("#### Server: %s, Image: %s"
                                           % (server, image))
                         else:
@@ -201,18 +212,25 @@ def main():
                         print("#### Exporting image %s on server: %s" % (args.image_filename, server))
 
                         logger.debug("Getting images from target server...")
-                        url = base_dst_api_url + IMAGE_BACKEND_URL
+                        url = base_dst_api_url + image_backend_url
                         r = requests.get(url, auth=(username, password))
                         if r.status_code == 200:
                             image_results = json.loads(r.text)
                             for image in image_results:
-                                if re.fullmatch(args.image_filename, image['filename']):
-                                    logger.debug("Found image: %s on server %s"
-                                                 % (image['filename'], server))
+                                if args.image_type == 'docker':
+                                    logger.fatal("Export of image type docker currently not supported. Docker images"
+                                                 "will be pulled automatically on first use on GNS3 server backend.")
+                                    raise ProxyError()
+                                else:
+                                    image_name = image['filename']
 
-                                    filename = str(server) + "_" + time.strftime("%Y%m%d-%H%M%S") + image['filename']
-                                    logger.debug("Downloading image %s to file %s " % (image['filename'], filename))
-                                    url = base_dst_api_url + IMAGE_BACKEND_URL + '/' + image['filename']
+                                if re.fullmatch(args.image_filename, image_name):
+                                    logger.debug("Found image: %s on server %s"
+                                                 % (image_name, server))
+
+                                    filename = str(server) + "_" + time.strftime("%Y%m%d-%H%M%S") + image_name
+                                    logger.debug("Downloading image %s to file %s " % (image_name, filename))
+                                    url = base_dst_api_url + image_backend_url + '/' + image_name
                                     r = requests.get(url, auth=(username, password), stream=True)
                                     total_length = int(r.headers.get('content-length'))
                                     transferred_length = 0
@@ -242,13 +260,13 @@ def main():
                                                     prev_transferred_length = transferred_length
 
                                                     print("Downloading %s (%.3f MB) ... %d%% (%.3f MB/s)" %
-                                                          (image['filename'], total_length/(1 << 20),
+                                                          (image_name, total_length/(1 << 20),
                                                            transferred_percentage, (rate/(1 << 20))))
 
                                                     next_percentage_to_print = next_percentage_to_print + 5
 
                                     print("#### Exported image %s from server: %s to file: "
-                                          % (image['filename'], config_servers[server]),
+                                          % (image_name, config_servers[server]),
                                           os.path.join(args.export_to_dir, filename))
 
                         else:
@@ -260,16 +278,23 @@ def main():
                               (args.import_from_file, server, args.image_filename))
 
                         logger.debug("Checking if target image exists...")
-                        url = base_dst_api_url + IMAGE_BACKEND_URL
+                        url = base_dst_api_url + image_backend_url
                         r = requests.get(url, auth=(username, password))
                         if r.status_code == 200:
                             image_exists = False
                             image_to_delete = ''
                             image_results = json.loads(r.text)
                             for image in image_results:
-                                if re.fullmatch(args.image_filename, image['filename']):
+                                if args.image_type == 'docker':
+                                    logger.fatal("Export of image type docker currently not supported. Docker images"
+                                                 "will be pulled automatically on first use on GNS3 server backend.")
+                                    raise ProxyError()
+                                else:
+                                    image_name = image['filename']
+
+                                if re.fullmatch(args.image_filename, image_name):
                                     logger.debug("image: %s already exists on server %s"
-                                                 % (image['filename'], server))
+                                                 % (image_name, server))
                                     if image_exists:
                                         logger.fatal(
                                             "Multiple images matched %s on server %s. "
@@ -279,14 +304,14 @@ def main():
                                         raise ProxyError()
                                     else:
                                         image_exists = True
-                                        image_to_delete = image['filename']
+                                        image_to_delete = image_name
 
                             if image_exists:
                                 if args.force:
                                     # deleting image
                                     # print("Deleting existing image %s on server: %s"
                                     #      % (image_to_delete, config_servers[server]))
-                                    # url = base_dst_api_url + IMAGE_BACKEND_URL + '/' + image_to_delete
+                                    # url = base_dst_api_url + image_backend_url + '/' + image_to_delete
                                     # r = requests.delete(url, auth=(username, password))
                                     # if not r.status_code == 204:
                                     #    if r.status_code == 404:
@@ -306,7 +331,7 @@ def main():
 
                             logger.debug("Importing image")
                             # import image
-                            url = base_dst_api_url + ALT_IMAGE_BACKEND_URL + '/' + args.image_filename
+                            url = base_dst_api_url + alt_image_backend_url + '/' + args.image_filename
                             # files = {'file': open(args.import_from_file, 'rb', args.buffer)}
                             # r = requests.post(url, files=files, auth=(username, password))
                             total_length = os.stat(args.import_from_file).st_size

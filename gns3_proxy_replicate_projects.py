@@ -24,7 +24,7 @@ import datetime
 import tempfile
 import requests
 
-VERSION = (0, 3)
+VERSION = (0, 4)
 __version__ = '.'.join(map(str, VERSION[0:2]))
 __description__ = 'GNS3 Proxy Replicate Projects'
 __author__ = 'Sebastian Rieger'
@@ -361,6 +361,26 @@ def main():
                                             logger.fatal("Unable to change mac address for node: %s in target project."
                                                          % node['name'])
                                             raise ProxyError()
+                                if 'mac_addr' in node['properties']:
+                                    if re.fullmatch(args.regenerate_mac_address,
+                                                    node['properties']['mac_addr']):
+                                        logger.debug('Found MAC address that needs to be changed: %s using match: %s'
+                                                     % (node['properties']['mac_addr'],
+                                                        args.regenerate_mac_address))
+                                        mac_addr = "0201.00%02x.%02x%02x" % (random.randint(0, 255),
+                                                                                   random.randint(0, 255),
+                                                                                   random.randint(0, 255))
+                                        # changing mac address in target project node
+                                        print("         Changing mac address of node: %s from: %s to: %s"
+                                                    % (node['name'], node['properties']['mac_addr'], mac_addr))
+                                        url = base_dst_api_url + '/projects/' + project_uuid + "/nodes/" \
+                                              + node['node_id']
+                                        data = '{ "properties": { "mac_addr": "' + mac_addr + '" } }'
+                                        r = requests.put(url, data, auth=(username, password))
+                                        if not r.status_code == 200:
+                                            logger.fatal("Unable to change mac address for node: %s in target project."
+                                                         % node['name'])
+                                            raise ProxyError()
 
                 # check if we need to inject a note describing the replication details in the project
                 if args.inject_replication_note:
@@ -398,7 +418,7 @@ def main():
                     url = base_dst_api_url + '/projects/' + project_uuid + "/close"
                     data = "{}"
                     r = requests.post(url, data, auth=(username, password))
-                    if not r.status_code == 201:
+                    if not r.status_code == 201 and not r.status_code == 204:
                         logger.fatal("Unable to close imported project on target server.")
                         raise ProxyError()
 

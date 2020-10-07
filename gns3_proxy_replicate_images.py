@@ -20,7 +20,7 @@ from ipaddress import ip_address
 
 import requests
 
-VERSION = (0, 3)
+VERSION = (0, 4)
 __version__ = '.'.join(map(str, VERSION[0:2]))
 __description__ = 'GNS3 Proxy Replicate Images'
 __author__ = 'Sebastian Rieger'
@@ -48,14 +48,6 @@ DEFAULT_CONFIG_FILE = 'gns3_proxy_config.ini'
 DEFAULT_LOG_LEVEL = 'INFO'
 DEFAULT_FORCE = False
 
-# TODO: add support for non-qemu images
-
-# Compute Image Backend
-IMAGE_BACKEND_URL = '/compute/qemu/images'
-
-# Alternate location for image access, used for upload by the GNS3 client, but download (GET) throws an error
-ALT_IMAGE_BACKEND_URL = '/computes/local/qemu/images'
-
 
 class ProxyError(Exception):
     pass
@@ -77,6 +69,10 @@ def parse_args(args):
     parser.add_argument('--force', action='store_true', default=DEFAULT_FORCE,
                         help='Force action without further prompt. E.g., delete images without further '
                              'verification.')
+
+    parser.add_argument('--image-type', type=str, required=True, choices=['qemu', 'dynamips', 'iou'],
+                        help='Type of the images to be managed.'
+                             'GNS3 currently uses different API for each image type.')
 
     parser.add_argument('--image-filename', type=str, required=True,
                         help='Name of the image to be replicated.'
@@ -134,6 +130,12 @@ def main():
     else:
         backend_port = 3080
 
+    # Compute Image Backend
+    image_backend_url = '/compute/' + args.image_type + '/images'
+
+    # Alternate location for image access, used for upload by the GNS3 client, but download (GET) throws an error
+    alt_image_backend_url = '/computes/local/' + args.image_type + '/images'
+
     # read servers from config
     if config.items('servers'):
         config_servers = dict()
@@ -169,7 +171,7 @@ def main():
         base_src_api_url = "http://" + src_server + ":" + str(backend_port) + "/v2"
         logger.debug("Searching source images")
         images = list()
-        url = base_src_api_url + IMAGE_BACKEND_URL
+        url = base_src_api_url + image_backend_url
 
         r = requests.get(url, auth=(username, password))
         if not r.status_code == 200:
@@ -221,7 +223,7 @@ def main():
                 base_dst_api_url = "http://" + target_server_address + ":" + str(backend_port) + "/v2"
 
                 logger.debug("Checking if target image exists...")
-                url = base_dst_api_url + IMAGE_BACKEND_URL
+                url = base_dst_api_url + image_backend_url
                 r = requests.get(url, auth=(username, password))
                 if r.status_code == 200:
                     target_image_exists = False
@@ -246,7 +248,7 @@ def main():
                             # deleting image
                             # print("Deleting existing image %s on server: %s"
                             #      % (image_to_delete, config_servers[server]))
-                            # url = base_dst_api_url + IMAGE_BACKEND_URL + '/' + image_to_delete
+                            # url = base_dst_api_url + image_backend_url + '/' + image_to_delete
                             # r = requests.delete(url, auth=(username, password))
                             # if not r.status_code == 204:
                             #    if r.status_code == 404:
@@ -266,7 +268,7 @@ def main():
 
                     # export source image
                     logger.debug("Opening source image")
-                    url = base_src_api_url + IMAGE_BACKEND_URL + '/' + image_filename
+                    url = base_src_api_url + image_backend_url + '/' + image_filename
                     r_export = requests.get(url, stream=True, auth=(username, password))
                     if not r_export.status_code == 200:
                         logger.fatal("Unable to export image from source server.")
@@ -304,7 +306,7 @@ def main():
 
                     # import target image
                     logger.debug("Opening target image")
-                    url = base_dst_api_url + ALT_IMAGE_BACKEND_URL + '/' + image_filename
+                    url = base_dst_api_url + alt_image_backend_url + '/' + image_filename
                     total_length = int(r_export.headers.get('content-length'))
                     r_import = requests.post(url, auth=(username, password), data=generate_chunk())
                     if not r_import.status_code == 200:
