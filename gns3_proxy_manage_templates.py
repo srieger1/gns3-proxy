@@ -217,8 +217,8 @@ def main():
                                     continue
 
                                 if re.fullmatch(args.template_name, template['name']):
-                                    print("#### Server: %s, Template: %s"
-                                          % (server, template))
+                                    print("#### Server: %s, Template name: %s, type: %s"
+                                          % (server, template['name'], template['template_type']))
                         else:
                             logger.fatal("Could not get status of templates from.")
                             raise ProxyError()

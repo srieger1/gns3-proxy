@@ -1,2 +1,2 @@
 #!/bin/bash
-docker logs -f gns3proxy
+docker logs --tail 100 -f gns3proxy

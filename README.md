@@ -9,8 +9,8 @@ as used, e.g., in the [Network Laboratory of Fulda University of Applied
 Sciences](https://www.hs-fulda.de/en/studies/departments/applied-computer-science/about-us/laboratories/netlab/). Students can connect to the proxy and requests will be authenticated,
 filtered and forwarded to appropriate backend servers. Proxy authentication
 also circumvents the current lack of multi-user support in GNS3. Without the
-proxy, due to the single user limitation (see "MULTIPLE USERS ENVIRONMENT"
-in [GNS3 Security](https://docs.gns3.com/1ON9JBXSeR7Nt2-Qum2o3ZX0GU86BZwlmNSUgvmqNWGY/index.html)),
+proxy, due to the multi user limitations (see "Multiple Users Environment"
+in [GNS3 Security](https://docs.gns3.com/docs/using-gns3/administration/gns3-security)),
 users will have to use the same admin credentials for GNS3 to access the 
 backend. Also, requests cannot be filtered and authorized (e.g., to deny
 deletion/creation of projects etc.). As GNS3 does not support proxies, several
@@ -49,7 +49,7 @@ gns3_proxy_manage_project.py and gns3_proxy_replicate_projects.py be combined wi
 Concept
 -------
 
-In our Network Laboratory we use several network emulators (besides GNS3 esp., mininet, VIRL and EVE-NG) and simulators
+In our Network Laboratory we use several network emulators (besides GNS3 esp., mininet, CML-P and EVE-NG) and simulators
 for courses and lab sessions as well as individual research or students' projects. As GNS3 is focusing on single user
 installations, several changes were necessary to provide lab session in class as well as to students working from
 at home. The following figure describes our setup:
@@ -127,6 +127,14 @@ mapping1="user2":"gns3-2"
 mapping2="user(.*)":"gns3-1"
 ```
 
+The `[project-filter]` section allows for filtering projects shown in the project list for individual users. Only
+projects matching the filter (filter_id="username regexp":"project name filter") are listed.
+
+```
+filter1="user1":"(.*)Group1(.*)"
+filter2="user2":"(.*)Group2(.*)"
+```
+
 The `[deny]` section defines requests that should be filtered and hence denied by the proxy (rule_id="user regexp":"http_request_method":"url regexp":"header regexp":"body regexp"), e.g. to deny modification to existing projects as well as deletion and creation of projects:
 
 ```
@@ -142,7 +150,7 @@ Installing a new server backend
 -------------------------------
 
 Deploy the GNS3 server appliance as usual. You can find further information regarding the installation of a server
-for multiple clients in the [GNS3 server for multiple clients docu](https://docs.gns3.com/1K_OVfincey0cUw6CP4dWVgs_pBXMdIJ6gdFGjNy8EZQ/index.html).
+for multiple clients in the [GNS3 server for multiple clients docu](https://docs.gns3.com/docs/using-gns3/administration/scale-gns3).
 Make sure to allow VT-x/AMD-V for the backend server. If configured correctly, "KVM support available: true" should be
 displayed in the menu after starting the server. The server should be configured to use a static IP address. This can 
 be done using the Shell or selecting the option "Network" (Configure network settings) from the GNS3 menu. Configure
@@ -173,7 +181,7 @@ Manual configuration of GNS3 server backends
 The only change necessary in the GNS3 server backends, is to edit the regular
 gns3_server.conf (available in the appliance terminal and, e.g., used to
 change username password etc., see also
-[GNS3 server configuration file](https://docs.gns3.com/1f6uXq05vukccKdMCHhdki5MXFhV8vcwuGwiRvXMQvM0/index.html))
+[GNS3 server configuration file](https://docs.gns3.com/docs/using-gns3/administration/gns3-server-configuration-file))
 and change the hostname from 0.0.0.0 to the IP address the server should
 listen on, e.g.:
 

@@ -301,7 +301,7 @@ def main():
                                     url = base_dst_api_url + '/projects/' + project_uuid + "/close"
                                     data = "{}"
                                     r = requests.post(url, data, auth=(username, password))
-                                    if not r.status_code == 201:
+                                    if not r.status_code == 201 and not r.status_code == 204:
                                         if r.status_code == 404:
                                             logger.debug("Project did not exist before, not closed")
                                         else:

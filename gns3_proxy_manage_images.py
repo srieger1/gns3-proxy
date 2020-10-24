@@ -168,7 +168,7 @@ def main():
         username = backend_user
         password = backend_password
 
-        print("#### Handling image type %s on server: %s" % (args.image_type, server))
+        print("#### Handling image type %s" % args.image_type)
 
         # Compute Image Backend
         image_backend_url = '/compute/' + args.image_type + '/images'

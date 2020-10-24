@@ -503,8 +503,8 @@ class Proxy(threading.Thread):
     Accepts `Client` connection object and act as a proxy between client and server.
     """
 
-    def __init__(self, client, backend_auth_code=None, backend_port=3080, server_recvbuf_size=8192,
-                 client_recvbuf_size=8192, default_server=None, config_servers=None,
+    def __init__(self, client, backend_auth_code=None, backend_port=3080, server_recvbuf_size=81920,
+                 client_recvbuf_size=81920, default_server=None, config_servers=None,
                  config_users=None, config_mapping=None, config_project_filter=None, config_deny=None):
         super(Proxy, self).__init__()
 
@@ -586,6 +586,12 @@ class Proxy(threading.Thread):
                 logger.error(
                     "Request did not contain an Authorization header. Please provide username and password in client.")
                 raise ProxyAuthenticationFailed()
+
+            # TODO: do not allow operations on filtered projects
+            # if /v2/projects/{project_id} ... resolve id? maybe store list of allowed ids on first project list
+            # retrieval, use as while list containing allowed project IDs
+            # a bit of a cosmetic issue, as using Web app and GNS3 client will not show filtered projects anyway
+            # only REST calls would be possible
 
             # evaluate denied requests
             if self.config_deny is not None and len(self.config_deny) > 0:
@@ -711,6 +717,7 @@ class Proxy(threading.Thread):
         if not self.request.method == b'CONNECT':
 
             # modification to data are only possible before response data is parsed
+            self.response.parse(data)
 
             # filter project list
             if self.config_project_filter is not None:
@@ -728,6 +735,18 @@ class Proxy(threading.Thread):
                     if user_matched:
                         header_block = data[:data.find(b'\r\n\r\n')]
                         body = data[data.find(b'\r\n\r\n'):]
+
+                        # make sure that body is complete, otherwise we cannot load and decode contained JSON
+                        for header in header_block.split(CRLF):
+                            if text_(header).startswith("Content-Length:"):
+                                content_length = int(text_(header).split(":")[1])
+                        while len(body) < content_length:
+                            logger.debug("Body is not complete (len: %d of content-length: %d), cannot decode JSON, try "
+                                        "to receive further content" % (len(body), content_length))
+                            data += self.server.recv(8192)
+                            body = data[data.find(b'\r\n\r\n'):]
+                            logger.debug("(len: %d of content-length: %d)" % (len(body), content_length))
+
 
                         try:
                             projects = json.loads(body)
@@ -753,12 +772,12 @@ class Proxy(threading.Thread):
 
                             new_data = bytes_(header_block_out) + b'\r\n' + bytes_(body)
                             data = new_data
-                        except json.decoder.JSONDecodeError:
-                            logger.error("JSONDecodeError during project filtering. %s", body)
+                        except json.decoder.JSONDecodeError as jde:
+                            logger.error("JSONDecodeError during project filtering. %s %s", body, jde)
 
 
             # parse data, no modification to data possible beyond this point
-            self.response.parse(data)
+            # self.response.parse(data)
 
             # check console_host config in project nodes, if value is "0.0.0.0" backend is likely not setup correctly
             # to work with the proxy (i.e., consoles not being accessible)
@@ -942,7 +961,7 @@ class HTTP(TCP):
     """
 
     def __init__(self, hostname='127.0.0.1', port=13080, backlog=100,
-                 backend_auth_code=None, backend_port=3080, server_recvbuf_size=8192, client_recvbuf_size=8192,
+                 backend_auth_code=None, backend_port=3080, server_recvbuf_size=81920, client_recvbuf_size=81920,
                  default_server=None, config_servers=None, config_users=None, config_mapping=None,
                  config_project_filter=None, config_deny=None):
         super(HTTP, self).__init__(hostname, port, backlog)
@@ -1085,7 +1104,7 @@ def main():
     if config.get('proxy', 'server-recvbuf-size'):
         server_recvbuf_size = config.getint('proxy', 'server-recvbuf-size')
     else:
-        server_recvbuf_size = 8192
+        server_recvbuf_size = 81920
 
     # get client-recvbuf-size config
     #
@@ -1096,7 +1115,7 @@ def main():
     if config.get('proxy', 'client-recvbuf-size'):
         client_recvbuf_size = config.getint('proxy', 'client-recvbuf-size')
     else:
-        client_recvbuf_size = 8192
+        client_recvbuf_size = 81920
 
     # get open-file-limit config
     #
