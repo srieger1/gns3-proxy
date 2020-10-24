@@ -11,7 +11,6 @@
     :license: BSD, see LICENSE for more details.
 """
 
-# TODO: override server backend for user, e.g., using username@backend as user
 # TODO: modification of requests/responses on-the-fly, e.g., to change advertised GNS3 server version? (faking GNS3
 #       client or server version seems risky as API is not necessarily backward compatible, e.g., massive changes from
 #       2.1 to 2.2)
@@ -605,10 +604,10 @@ class Proxy(threading.Thread):
                                 if username == access_user:
                                     logger.debug(
                                         "User matched mapping %s = %s, evaluating deny rule %s" % (
-                                        item["user"], key, item))
+                                            item["user"], key, item))
                                     logger.debug(
                                         "Debug deny rule %s %s" % (
-                                        text_(self.request.method), text_(self.request.url.path)))
+                                            text_(self.request.method), text_(self.request.url.path)))
                                     # logger.info("Method: %s %s %s" % ((re.fullmatch(item["method"],text_(self.request.method)),
                                     #   item["method"], text_(self.request.method))))
                                     # logger.info("Path: %s %s %s" % ((re.fullmatch(item["url"],text_(self.request.url.path)),
@@ -716,12 +715,12 @@ class Proxy(threading.Thread):
         # only for non-https requests
         if not self.request.method == b'CONNECT':
 
-            # modification to data are only possible before response data is parsed
             self.response.parse(data)
 
             # filter project list
             if self.config_project_filter is not None:
-                if data.find(b'X-Route: /v2/projects\r\n') != -1:
+                if b'x-route' in self.response.headers and self.response.headers[b'x-route'][1].lower() == \
+                        b'/v2/projects':
                     logger.debug("Filtering project library in response")
                     user_matched = False
                     user_project_filters = list()
@@ -740,13 +739,12 @@ class Proxy(threading.Thread):
                         for header in header_block.split(CRLF):
                             if text_(header).startswith("Content-Length:"):
                                 content_length = int(text_(header).split(":")[1])
-                        while len(body) < content_length:
-                            logger.debug("Body is not complete (len: %d of content-length: %d), cannot decode JSON, try "
-                                        "to receive further content" % (len(body), content_length))
-                            data += self.server.recv(8192)
+                        while len(body) - 4 < content_length:
+                            logger.debug("Body is not complete (len: %d of content-length: %d), cannot decode JSON, "
+                                        "trying to receive further content" % (len(body) - 4, content_length))
+                            data += self.server.recv(self.server_recvbuf_size)
                             body = data[data.find(b'\r\n\r\n'):]
-                            logger.debug("(len: %d of content-length: %d)" % (len(body), content_length))
-
+                            logger.debug("(len: %d of content-length: %d)" % (len(body) - 4, content_length))
 
                         try:
                             projects = json.loads(body)
@@ -775,9 +773,9 @@ class Proxy(threading.Thread):
                         except json.decoder.JSONDecodeError as jde:
                             logger.error("JSONDecodeError during project filtering. %s %s", body, jde)
 
-
-            # parse data, no modification to data possible beyond this point
-            # self.response.parse(data)
+                # if b'x-route' in self.response.headers:
+                #     if self.response.headers[b'x-route'][1].lower() == b'/v2/projects/{project_id}/open':
+                #         logger.debug("x-route: %s", self.response.headers[b'x-route'][1].lower())
 
             # check console_host config in project nodes, if value is "0.0.0.0" backend is likely not setup correctly
             # to work with the proxy (i.e., consoles not being accessible)
@@ -796,7 +794,7 @@ class Proxy(threading.Thread):
                     # logger.info("%s", data)
 
             # demo to intercept specific response
-            #if b'x-route' in self.response.headers:
+            # if b'x-route' in self.response.headers:
             #    if self.response.headers[b'x-route'][1].lower() == b'/v2/settings':
             #        logger.info("%s", self.response.headers[b'x-route'])
 
