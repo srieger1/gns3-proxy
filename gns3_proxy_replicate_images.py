@@ -18,6 +18,7 @@ import sys
 import time
 from ipaddress import ip_address
 
+from requests_toolbelt.streaming_iterator import StreamingIterator
 import requests
 
 VERSION = (0, 4)
@@ -316,7 +317,8 @@ def main():
                     logger.debug("Opening target image")
                     url = base_dst_api_url + alt_image_backend_url + '/' + image_filename
                     total_length = int(r_export.headers.get('content-length'))
-                    r_import = requests.post(url, auth=(username, password), data=generate_chunk())
+                    streamer = StreamingIterator(total_length, generate_chunk())
+                    r_import = requests.post(url, auth=(username, password), data=streamer)
                     if not r_import.status_code == 200:
                         if r_import.status_code == 403:
                             logger.fatal("Forbidden to import image on target server.")

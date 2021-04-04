@@ -26,6 +26,7 @@ RUN apk add --no-cache bash
 RUN apk add --no-cache nano
 
 RUN pip install requests
+RUN pip install requests-toolbelt
 RUN pip install packaging
 
 WORKDIR /home/gns3_proxy
