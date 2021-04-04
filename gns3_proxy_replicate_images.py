@@ -227,6 +227,7 @@ def main():
                 r = requests.get(url, auth=(username, password))
                 if r.status_code == 200:
                     target_image_exists = False
+                    target_image_md5sum = ''
                     target_image_to_delete = ''
                     target_image_results = json.loads(r.text)
                     for target_image in target_image_results:
@@ -241,6 +242,7 @@ def main():
                                 raise ProxyError()
                             else:
                                 target_image_exists = True
+                                target_image_md5sum = target_image['md5sum']
                                 target_image_to_delete = image['filename']
 
                     if target_image_exists:
@@ -259,10 +261,16 @@ def main():
                             logger.debug(
                                 "image: %s (%s) already exists on server %s. Overwriting it."
                                 % (image_filename, target_image_to_delete, target_server_name))
+                        elif image['md5sum'] == target_image_md5sum:
+                            logger.debug(
+                                "image: %s (%s) already exists on server %s, skipping transfer. "
+                                "Use --force to overwrite it during import."
+                                % (image_filename, target_image_to_delete, target_server_name))
+                            continue
                         else:
                             logger.fatal(
-                                "image: %s (%s) already exists on server %s. Use --force to overwrite it"
-                                " during import."
+                                "image: %s (%s) already exists on server, but the md5sum does not match."
+                                "on target %s. Use --force to overwrite it during import."
                                 % (image_filename, target_image_to_delete, target_server_name))
                             raise ProxyError()
 
