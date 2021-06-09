@@ -1082,9 +1082,9 @@ def main():
     #Both upper and lowercase values are allowed
     #You may also simply use the leading character e.g. --log-level d
     if config.get('proxy','log-level'):
-    	log-level = config.get('proxy','log-level')
+    	DEFAULT_LOG_LEVEL = config.get('proxy','log-level')
     else:
-    	log-level = "INFO"
+    	DEFAULT_LOG_LEVEL = "INFO"
     	
     #get inactivity time limit
     #
