@@ -53,6 +53,7 @@ if os.name != 'nt':
 # Default arguments
 DEFAULT_CONFIG_FILE = 'gns3_proxy_config.ini'
 DEFAULT_LOG_LEVEL = 'INFO'
+DEFAULT_INACTIVITY_TIME = 300
 
 VERSION = (0, 8)
 __version__ = '.'.join(map(str, VERSION[0:2]))
@@ -536,7 +537,7 @@ class Proxy(threading.Thread):
         return (self._now() - self.last_activity).seconds
 
     def _is_inactive(self):
-        return self._inactive_for() > inactivity-time
+        return self._inactive_for() > DEFAULT_INACTIVITY_TIME
 
     def _process_request(self, data):
         # once we have connection to the server
@@ -1086,14 +1087,14 @@ def main():
     else:
     	DEFAULT_LOG_LEVEL = "INFO"
     	
-    #get inactivity time limit
+    #get  inactivity time limit
     #
     #time after breaking connection for console 
     #default is 30s 
     if config.get('proxy','inactivity-time'):
-    	inactivity_time = config.get('proxy','inactivity-time')
+    	DEFAULT_INACTIVITY_TIME = config.get('proxy','inactivity-time')
     else:
-    	inactivity_time = 300	
+    	DEFAULT_INACTIVITY_TIME = 300	
     
     
 
