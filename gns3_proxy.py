@@ -890,8 +890,8 @@ class Proxy(threading.Thread):
                     break
 
                 if self._is_inactive():
-                    logger.info('client buffer is empty and maximum inactivity has reached, breaking')
-                    break
+                    logger.info('client buffer is empty and maximum inactivity has reached, not breaking')
+                    
 
     @staticmethod
     def _get_response_pkt_by_exception(e):
