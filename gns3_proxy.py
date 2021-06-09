@@ -52,7 +52,7 @@ if os.name != 'nt':
 
 # Default arguments
 DEFAULT_CONFIG_FILE = 'gns3_proxy_config.ini'
-DEFAULT_LOG_LEVEL = 'INFO'
+DEFAULT_LOG_LEVEL = 'DEBUG'
 
 VERSION = (0, 8)
 __version__ = '.'.join(map(str, VERSION[0:2]))
