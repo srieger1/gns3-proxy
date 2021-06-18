@@ -53,6 +53,7 @@ if os.name != 'nt':
 # Default arguments
 DEFAULT_CONFIG_FILE = 'gns3_proxy_config.ini'
 DEFAULT_LOG_LEVEL = 'INFO'
+DEFAULT_INACTIVITY_TIME = 300
 
 VERSION = (0, 8)
 __version__ = '.'.join(map(str, VERSION[0:2]))
@@ -536,7 +537,7 @@ class Proxy(threading.Thread):
         return (self._now() - self.last_activity).seconds
 
     def _is_inactive(self):
-        return self._inactive_for() > 30
+        return self._inactive_for() > DEFAULT_INACTIVITY_TIME
 
     def _process_request(self, data):
         # once we have connection to the server
@@ -890,8 +891,9 @@ class Proxy(threading.Thread):
                     break
 
                 if self._is_inactive():
-                    logger.info('client buffer is empty and maximum inactivity has reached, breaking')
+                    logger.info('client buffer is empty and maximum inactivity has reached, not breaking')
                     break
+                    
 
     @staticmethod
     def _get_response_pkt_by_exception(e):
@@ -1074,6 +1076,27 @@ def main():
         backend_port = config.getint('proxy', 'backend_port')
     else:
         backend_port = 3080
+        
+    #get log level
+    #
+    #Valid options: DEBUG, INFO (default), WARNING, ERROR, CRITICAL.
+    #Both upper and lowercase values are allowed
+    #You may also simply use the leading character e.g. --log-level d
+    if config.get('proxy','log-level'):
+    	DEFAULT_LOG_LEVEL = config.get('proxy','log-level')
+    else:
+    	DEFAULT_LOG_LEVEL = "INFO"
+    	
+    #get  inactivity time limit
+    #
+    #time after breaking connection for console 
+    #default is 30s 
+    if config.get('proxy','inactivity-time'):
+    	DEFAULT_INACTIVITY_TIME = config.get('proxy','inactivity-time')
+    else:
+    	DEFAULT_INACTIVITY_TIME = 300	
+    
+    
 
     # get default_server
     #
