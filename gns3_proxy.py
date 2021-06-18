@@ -53,7 +53,6 @@ if os.name != 'nt':
 # Default arguments
 DEFAULT_CONFIG_FILE = 'gns3_proxy_config.ini'
 DEFAULT_LOG_LEVEL = 'INFO'
-DEFAULT_INACTIVITY_TIME = 300
 
 VERSION = (0, 9)
 __version__ = '.'.join(map(str, VERSION[0:2]))
@@ -503,13 +502,14 @@ class Proxy(threading.Thread):
     Accepts `Client` connection object and act as a proxy between client and server.
     """
 
-    def __init__(self, client, backend_auth_code=None, backend_port=3080, server_recvbuf_size=81920,
-                 client_recvbuf_size=81920, default_server=None, config_servers=None,
+    def __init__(self, client, backend_auth_code=None, backend_port=3080, server_recvbuf_size=65536,
+                 client_recvbuf_size=65536, inactivity_timeout=300, default_server=None, config_servers=None,
                  config_users=None, config_mapping=None, config_project_filter=None, config_deny=None):
         super(Proxy, self).__init__()
 
         self.start_time = self._now()
         self.last_activity = self.start_time
+        self.inactivity_timeout = inactivity_timeout
 
         self.client = client
         self.client_recvbuf_size = client_recvbuf_size
@@ -537,7 +537,7 @@ class Proxy(threading.Thread):
         return (self._now() - self.last_activity).seconds
 
     def _is_inactive(self):
-        return self._inactive_for() > DEFAULT_INACTIVITY_TIME
+        return self._inactive_for() > self.inactivity_timeout
 
     def _process_request(self, data):
         # once we have connection to the server
@@ -742,7 +742,7 @@ class Proxy(threading.Thread):
                                 content_length = int(text_(header).split(":")[1])
                         while len(body) - 4 < content_length:
                             logger.debug("Body is not complete (len: %d of content-length: %d), cannot decode JSON, "
-                                        "trying to receive further content" % (len(body) - 4, content_length))
+                                         "trying to receive further content" % (len(body) - 4, content_length))
                             data += self.server.recv(self.server_recvbuf_size)
                             body = data[data.find(b'\r\n\r\n'):]
                             logger.debug("(len: %d of content-length: %d)" % (len(body) - 4, content_length))
@@ -893,7 +893,6 @@ class Proxy(threading.Thread):
                 if self._is_inactive():
                     logger.info('client buffer is empty and maximum inactivity has reached, breaking')
                     break
-                    
 
     @staticmethod
     def _get_response_pkt_by_exception(e):
@@ -961,12 +960,13 @@ class HTTP(TCP):
     """
 
     def __init__(self, hostname='127.0.0.1', port=13080, backlog=100,
-                 backend_auth_code=None, backend_port=3080, server_recvbuf_size=81920, client_recvbuf_size=81920,
-                 default_server=None, config_servers=None, config_users=None, config_mapping=None,
-                 config_project_filter=None, config_deny=None):
+                 backend_auth_code=None, backend_port=3080, server_recvbuf_size=65536, client_recvbuf_size=65536,
+                 inactivity_timeout=300, default_server=None, config_servers=None, config_users=None,
+                 config_mapping=None, config_project_filter=None, config_deny=None):
         super(HTTP, self).__init__(hostname, port, backlog)
         self.client_recvbuf_size = client_recvbuf_size
         self.server_recvbuf_size = server_recvbuf_size
+        self.inactivity_timeout = inactivity_timeout
 
         self.backend_auth_code = backend_auth_code
         self.backend_port = backend_port
@@ -1014,7 +1014,6 @@ def parse_args(args):
                         help='Valid options: DEBUG, INFO (default), WARNING, ERROR, CRITICAL. '
                              'Both upper and lowercase values are allowed.'
                              'You may also simply use the leading character e.g. --log-level d')
-
     return parser.parse_args(args)
 
 
@@ -1024,9 +1023,11 @@ def main():
 
     logging.basicConfig(level=getattr(logging, args.log_level),
                         format='%(asctime)s - %(levelname)s - %(funcName)s:%(lineno)d - %(message)s')
+    logger.debug("Logging with log level: %s" % args.log_level)
 
     # parse config file gns3_proxy_config.ini
     config = configparser.ConfigParser()
+    logger.debug("Loading config file: %s" % args.config_file)
     config.read_file(open(args.config_file))
     config.read(args.config_file)
 
@@ -1034,87 +1035,44 @@ def main():
     #
     # description: Hostname (and hence IP address or interface) the GNS3 proxy listens on
     # default: 127.0.0.1
-    if config.get('proxy', 'hostname'):
-        hostname = config.get('proxy', 'hostname')
-    else:
-        hostname = "127.0.0.1"
+    hostname = config.get('proxy', 'hostname', fallback="127.0.0.1")
 
     # get port
     #
     # description: TCP port the GNS3 proxy listens on
     # default: 13080
-    if config.get('proxy', 'port'):
-        port = config.getint('proxy', 'port')
-    else:
-        port = 13080
+    port = config.getint('proxy', 'port', fallback=13080)
 
     # get backend_user
     #
     # description: Username to use to access backend GNS3 server
     # default: admin
-    if config.get('proxy', 'backend_user'):
-        backend_user = config.get('proxy', 'backend_user')
-    else:
-        backend_user = "admin"
+    backend_user = config.get('proxy', 'backend_user', fallback="admin")
 
     # get backend_password
     #
     # description: Password to use to access backend GNS3 server
     # default: password
-    if config.get('proxy', 'backend_password'):
-        backend_password = config.get('proxy', 'backend_password')
-    else:
-        backend_password = "password"
-
+    backend_password = config.get('proxy', 'backend_password', fallback="password")
     backend_auth_code = b'Basic ' + base64.b64encode(bytes_(backend_user + ":" + backend_password))
 
     # get backend_port
     #
     # description: TCP port to use to access backend GNS3 server
     # default: 3080
-    if config.get('proxy', 'backend_port'):
-        backend_port = config.getint('proxy', 'backend_port')
-    else:
-        backend_port = 3080
-        
-    #get log level
-    #
-    #Valid options: DEBUG, INFO (default), WARNING, ERROR, CRITICAL.
-    #Both upper and lowercase values are allowed
-    #You may also simply use the leading character e.g. --log-level d
-    if config.get('proxy','log-level'):
-    	DEFAULT_LOG_LEVEL = config.get('proxy','log-level')
-    else:
-    	DEFAULT_LOG_LEVEL = "INFO"
-    	
-    #get  inactivity time limit
-    #
-    #time after breaking connection for console 
-    #default is 30s 
-    if config.get('proxy','inactivity-time'):
-    	DEFAULT_INACTIVITY_TIME = config.get('proxy','inactivity-time')
-    else:
-    	DEFAULT_INACTIVITY_TIME = 300	
-    
-    
+    backend_port = config.getint('proxy', 'backend_port', fallback=3080)
 
     # get default_server
     #
     # description: Default GNS3 server to use as a fallback backend if none of the mappings matched
     # default: None
-    if config.get('proxy', 'default_server'):
-        default_server = config.get('proxy', 'default_server')
-    else:
-        default_server = None
+    default_server = config.get('proxy', 'default_server', fallback=None)
 
     # get backlog
     #
     # description: Maximum number of pending connections to proxy server
     # default: 100
-    if config.get('proxy', 'backlog'):
-        backlog = config.getint('proxy', 'backlog')
-    else:
-        backlog = 100
+    backlog = config.getint('proxy', 'backlog', fallback=100)
 
     # get server-recvbuf-size config
     #
@@ -1122,10 +1080,7 @@ def main():
     #     recv() operation. Bump this value for faster uploads at the expense of
     #     increased RAM.
     # default: 1024
-    if config.get('proxy', 'server-recvbuf-size'):
-        server_recvbuf_size = config.getint('proxy', 'server-recvbuf-size')
-    else:
-        server_recvbuf_size = 81920
+    server_recvbuf_size = config.getint('proxy', 'server-recvbuf-size', fallback=65536)
 
     # get client-recvbuf-size config
     #
@@ -1133,22 +1088,22 @@ def main():
     #     recv() operation. Bump this value for faster uploads at the expense of
     #     increased RAM.
     # default: 1024
-    if config.get('proxy', 'client-recvbuf-size'):
-        client_recvbuf_size = config.getint('proxy', 'client-recvbuf-size')
-    else:
-        client_recvbuf_size = 81920
+    client_recvbuf_size = config.getint('proxy', 'client-recvbuf-size', fallback=65536)
 
     # get open-file-limit config
     #
     # description: Maximum number of files (TCP connections) that gns3-proxy can open concurrently.
     # default: 8192
-    if config.get('proxy', 'open-file-limit'):
-        open_file_limit = config.getint('proxy', 'open-file-limit')
-    else:
-        open_file_limit = 1024
+    open_file_limit = config.getint('proxy', 'open-file-limit', fallback=1024)
+
+    # get  inactivity timeout
+    #
+    # time after breaking connection for console
+    # default is 300s
+    inactivity_timeout = config.get('proxy', 'inactivity-timeout', fallback=300)
 
     # read servers from config
-    if config.items('servers'):
+    if 'servers' in config.sections():
         config_servers = dict()
         server_items = config.items('servers')
         for key, value in server_items:
@@ -1162,7 +1117,7 @@ def main():
         config_servers = None
 
     # read users from config
-    if config.items('users'):
+    if 'users' in config.sections():
         config_users = dict()
         user_items = config.items('users')
         for key, value in user_items:
@@ -1171,7 +1126,7 @@ def main():
         config_users = None
 
     # read mapping from config
-    if config.items('mapping'):
+    if 'mapping' in config.sections():
         config_mapping = list()
         mapping_items = config.items('mapping')
         for key, value in mapping_items:
@@ -1200,7 +1155,7 @@ def main():
         config_mapping = None
 
     # read project filter from config
-    if config.items('project-filter'):
+    if 'project-filter' in config.sections():
         config_project_filter = list()
         project_filter_items = config.items('project-filter')
         for key, value in project_filter_items:
@@ -1224,7 +1179,7 @@ def main():
         config_project_filter = None
 
     # read deny from config
-    if config.items('deny'):
+    if 'deny' in config.sections():
         config_deny = list()
         deny_items = config.items('deny')
         for key, value in deny_items:
@@ -1264,6 +1219,7 @@ def main():
     logger.debug("Config server-recvbuf-size: %s" % server_recvbuf_size)
     logger.debug("Config client-recvbuf-size: %s" % client_recvbuf_size)
     logger.debug("Config open-file-limit: %s" % open_file_limit)
+    logger.debug("Config inactivity-timeout: %s" % inactivity_timeout)
 
     logger.debug("Config servers: %s" % config_servers)
     logger.debug("Config users: %s" % config_users)
@@ -1281,6 +1237,7 @@ def main():
                      backend_port=backend_port,
                      server_recvbuf_size=server_recvbuf_size,
                      client_recvbuf_size=client_recvbuf_size,
+                     inactivity_timeout=inactivity_timeout,
                      default_server=default_server,
                      config_servers=config_servers,
                      config_users=config_users,
