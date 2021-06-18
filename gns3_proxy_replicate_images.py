@@ -18,6 +18,7 @@ import sys
 import time
 from ipaddress import ip_address
 
+from requests_toolbelt.streaming_iterator import StreamingIterator
 import requests
 
 VERSION = (0, 4)
@@ -227,6 +228,7 @@ def main():
                 r = requests.get(url, auth=(username, password))
                 if r.status_code == 200:
                     target_image_exists = False
+                    target_image_md5sum = ''
                     target_image_to_delete = ''
                     target_image_results = json.loads(r.text)
                     for target_image in target_image_results:
@@ -241,6 +243,7 @@ def main():
                                 raise ProxyError()
                             else:
                                 target_image_exists = True
+                                target_image_md5sum = target_image['md5sum']
                                 target_image_to_delete = image['filename']
 
                     if target_image_exists:
@@ -259,10 +262,16 @@ def main():
                             logger.debug(
                                 "image: %s (%s) already exists on server %s. Overwriting it."
                                 % (image_filename, target_image_to_delete, target_server_name))
+                        elif image['md5sum'] == target_image_md5sum:
+                            logger.debug(
+                                "image: %s (%s) already exists on server %s, skipping transfer. "
+                                "Use --force to overwrite it during import."
+                                % (image_filename, target_image_to_delete, target_server_name))
+                            continue
                         else:
                             logger.fatal(
-                                "image: %s (%s) already exists on server %s. Use --force to overwrite it"
-                                " during import."
+                                "image: %s (%s) already exists on server, but the md5sum does not match."
+                                "on target %s. Use --force to overwrite it during import."
                                 % (image_filename, target_image_to_delete, target_server_name))
                             raise ProxyError()
 
@@ -308,7 +317,8 @@ def main():
                     logger.debug("Opening target image")
                     url = base_dst_api_url + alt_image_backend_url + '/' + image_filename
                     total_length = int(r_export.headers.get('content-length'))
-                    r_import = requests.post(url, auth=(username, password), data=generate_chunk())
+                    streamer = StreamingIterator(total_length, generate_chunk())
+                    r_import = requests.post(url, auth=(username, password), data=streamer)
                     if not r_import.status_code == 200:
                         if r_import.status_code == 403:
                             logger.fatal("Forbidden to import image on target server.")
