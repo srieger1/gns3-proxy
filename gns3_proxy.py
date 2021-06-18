@@ -55,7 +55,7 @@ DEFAULT_CONFIG_FILE = 'gns3_proxy_config.ini'
 DEFAULT_LOG_LEVEL = 'INFO'
 DEFAULT_INACTIVITY_TIME = 300
 
-VERSION = (0, 8)
+VERSION = (0, 9)
 __version__ = '.'.join(map(str, VERSION[0:2]))
 __description__ = 'GNS3 Proxy based on proxy.py by Abhinav Singh (https://github.com/abhinavsingh/proxy.py)'
 __author__ = 'Sebastian Rieger'
@@ -891,7 +891,7 @@ class Proxy(threading.Thread):
                     break
 
                 if self._is_inactive():
-                    logger.info('client buffer is empty and maximum inactivity has reached, not breaking')
+                    logger.info('client buffer is empty and maximum inactivity has reached, breaking')
                     break
                     
 
