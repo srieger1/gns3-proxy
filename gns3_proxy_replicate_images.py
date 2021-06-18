@@ -21,7 +21,7 @@ from ipaddress import ip_address
 from requests_toolbelt.streaming_iterator import StreamingIterator
 import requests
 
-VERSION = (0, 4)
+VERSION = (0, 5)
 __version__ = '.'.join(map(str, VERSION[0:2]))
 __description__ = 'GNS3 Proxy Replicate Images'
 __author__ = 'Sebastian Rieger'
@@ -283,6 +283,8 @@ def main():
                         logger.fatal("Unable to export image from source server.")
                         raise ProxyError()
 
+                    start_timestamp = int(round(time.time()))
+
                     def generate_chunk():
                         transferred_length_upload = 0
                         prev_transferred_length_upload = 0
@@ -317,6 +319,7 @@ def main():
                     logger.debug("Opening target image")
                     url = base_dst_api_url + alt_image_backend_url + '/' + image_filename
                     total_length = int(r_export.headers.get('content-length'))
+                    # r_import = requests.post(url, auth=(username, password), data=generate_chunk())
                     streamer = StreamingIterator(total_length, generate_chunk())
                     r_import = requests.post(url, auth=(username, password), data=streamer)
                     if not r_import.status_code == 200:
@@ -327,8 +330,11 @@ def main():
                             logger.fatal("Unable to import image on target server.")
                             raise ProxyError()
                     else:
-                        print("#### image %s replicated from server: %s to server: %s"
-                              % (image_filename, args.source_server, target_server_name))
+                        end_timestamp = int(round(time.time()))
+
+                        print("#### image %s (%s bytes) replicated from server: %s to server: %s (in %i secs)"
+                              % (image_filename, total_length, args.source_server, target_server_name,
+                                 (end_timestamp - start_timestamp)))
 
                 else:
                     logger.fatal("Could not get status of images from server %s." % target_server_name)

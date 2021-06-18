@@ -104,7 +104,7 @@ The `[proxy]` section contains following parameters for gns3-proxy:
 - **server-recvbuf-size** Server receive buffer size (TCP socket) of the proxy in bytes. Increase this value for better performance of large responses from backend servers (default: 8192, recommended for production: 1048576)
 - **client-recvbuf-size** Client receive buffer size (TCP socket) of the proxy in bytes. Increase this value for better performance of large requests from clients (default: 8192, recommended for production: 1048576)
 - **open-file-limit** Maximum number of parallel open files (socket fds) of the proxy (default: 1024)
-- **log-level** Log level. Increase to DEBUG for debugging output. (default: INFO)
+- **inactivity-timeout** Log level. Increase to DEBUG for debugging output. (default: 300)
 
 The `[servers]` section contains the defined backend servers (server_name=ip_address), e.g.:
 
@@ -199,10 +199,19 @@ Command syntax is:
 
 ```
 usage: gns3_proxy_replicate_projects.py [-h] [--config-file CONFIG_FILE]
-                                        [--delete-target-project] [--force]
-                                        [--inject-replication-note]
                                         [--log-level LOG_LEVEL]
+                                        [--delete-target-project] [--force]
+                                        [--include-base-images]
+                                        [--include-snapshots]
+                                        [--reset-mac-addresses]
+                                        [--compression COMPRESSION]
                                         (--project-id PROJECT_ID | --project-name PROJECT_NAME)
+                                        [--duplicate-target-project]
+                                        [--duplicate-name DUPLICATE_NAME]
+                                        [--duplicate-start DUPLICATE_START]
+                                        [--duplicate-end DUPLICATE_END]
+                                        [--duplicates-per-target-server DUPLICATES_PER_TARGET_SERVER]
+                                        [--inject-replication-note]
                                         [--regenerate-mac-address REGENERATE_MAC_ADDRESS]
                                         --source-server SOURCE_SERVER
                                         --target-server TARGET_SERVER
@@ -227,9 +236,17 @@ Command syntax is:
 
 ```
 usage: gns3_proxy_manage_projects.py [-h] [--config-file CONFIG_FILE]
-                                     [--force] [--log-level LOG_LEVEL]
+                                     [--log-level LOG_LEVEL] [--force]
                                      (--project-id PROJECT_ID | --project-name PROJECT_NAME)
-                                     (--export-to-dir EXPORT_TO_DIR | --import-from-file IMPORT_FROM_FILE | --show | --delete | --start | --stop)
+                                     [--include-base-images]
+                                     [--include-snapshots]
+                                     [--reset-mac-addresses]
+                                     [--compression COMPRESSION]
+                                     [--duplicate-name DUPLICATE_NAME]
+                                     [--duplicate-start DUPLICATE_START]
+                                     [--duplicate-end DUPLICATE_END]
+                                     [--duplicates-per-target-server DUPLICATES_PER_TARGET_SERVER]
+                                     (--export-to-dir EXPORT_TO_DIR | --import-from-file IMPORT_FROM_FILE | --show | --delete | --duplicate | --start | --stop)
                                      --target-server TARGET_SERVER
 ```
 

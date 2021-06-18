@@ -23,7 +23,7 @@ from ipaddress import ip_address
 
 import requests
 
-VERSION = (0, 2)
+VERSION = (0, 3)
 __version__ = '.'.join(map(str, VERSION[0:2]))
 __description__ = 'GNS3 Proxy Manage Projects'
 __author__ = 'Sebastian Rieger'
@@ -52,8 +52,12 @@ DEFAULT_LOG_LEVEL = 'INFO'
 DEFAULT_START_ACTION = False
 DEFAULT_STOP_ACTION = False
 DEFAULT_DELETE_ACTION = False
+DEFAULT_DUPLICATE_ACTION = False
 DEFAULT_SHOW_ACTION = False
 DEFAULT_FORCE = False
+DEFAULT_INCLUDE_BASE_IMAGES = False
+DEFAULT_INCLUDE_SNAPSHOTS = False
+DEFAULT_RESET_MAC_ADDRESSES = False
 
 
 class ProxyError(Exception):
@@ -83,6 +87,27 @@ def parse_args(args):
                                help='Project name to copy. Can be specified as a regular expression to match '
                                     'multiple projects.')
 
+    parser.add_argument('--include-base-images', action='store_true', default=DEFAULT_INCLUDE_BASE_IMAGES,
+                        help='Include base images in the export used to replicate the project.')
+    parser.add_argument('--include-snapshots', action='store_true', default=DEFAULT_INCLUDE_SNAPSHOTS,
+                        help='Force action without further prompt. E.g., overwrite or delete existing projects '
+                             'without further verification.')
+    parser.add_argument('--reset-mac-addresses', action='store_true', default=DEFAULT_RESET_MAC_ADDRESSES,
+                        help='Reset all mac addresses in the exported project.')
+    parser.add_argument('--compression', type=str, default='zip',
+                        help='Compress exported project used for the replication. Possible values \'zip\', \'bzip2\''
+                             '\'lzma\', \'none\'.')
+
+    parser.add_argument('--duplicate-name', type=str,
+                        help='Name to use as a prefix for the duplicated project. An ascending number from'
+                             '--duplicate-start to --duplicate-end will be appended to the project name.')
+    parser.add_argument('--duplicate-start', type=int, default=1,
+                        help='Start numbering of duplicates using the specified number.')
+    parser.add_argument('--duplicate-end', type=int, default=1,
+                        help='End numbering of duplicates using the specified number.')
+    parser.add_argument('--duplicates-per-target-server', type=int, default=0,
+                        help='Number of duplicates per server. Distribute duplicates across matched target servers.')
+
     action_group = parser.add_mutually_exclusive_group(required=True)
     action_group.add_argument('--export-to-dir', type=str,
                               help='Export projects to directory.')
@@ -92,6 +117,8 @@ def parse_args(args):
                               help='Show projects and their status.')
     action_group.add_argument('--delete', action='store_true', default=DEFAULT_DELETE_ACTION,
                               help='Delete projects.')
+    action_group.add_argument('--duplicate', action='store_true', default=DEFAULT_DUPLICATE_ACTION,
+                              help='Duplicate projects.')
     action_group.add_argument('--start', action='store_true', default=DEFAULT_START_ACTION,
                               help='Start projects.')
     action_group.add_argument('--stop', action='store_true', default=DEFAULT_STOP_ACTION,
@@ -170,6 +197,7 @@ def main():
         # Try to find match for target server in config
         if len(config_servers) > 0:
             base_dst_api_url = None
+            duplicate_number = args.duplicate_start
             for server in config_servers:
                 if re.fullmatch(args.target_server, server):
                     logger.debug("Target server found: %s (%s) using provided match: %s" % (server,
@@ -204,7 +232,7 @@ def main():
                                 url = base_dst_api_url + '/projects/' + project_uuid + "/close"
                                 data = "{}"
                                 r = requests.post(url, data, auth=(username, password))
-                                if not r.status_code == 201:
+                                if not r.status_code == 201 and not r.status_code == 204:
                                     if r.status_code == 404:
                                         logger.debug("Project did not exist before, not closed")
                                     else:
@@ -242,7 +270,7 @@ def main():
                                 raise ProxyError()
                         else:
                             print("#### Project %s imported from file: %s on server: %s"
-                                        % (project_uuid, args.import_from_file, server))
+                                  % (project_uuid, args.import_from_file, server))
                     else:
                         logger.debug("Searching target project UUIDs")
                         projects = list()
@@ -275,21 +303,35 @@ def main():
                                 url = base_dst_api_url + '/projects/' + project_uuid + "/close"
                                 data = "{}"
                                 r = requests.post(url, data, auth=(username, password))
-                                if not r.status_code == 201:
+                                if not r.status_code == 201 and not r.status_code == 204:
                                     logger.fatal("Unable to close project. Project does not exist or is corrupted?")
                                     raise ProxyError()
 
                                 # export project
                                 logger.debug("Exporting project")
-                                url = base_dst_api_url + '/projects/' + project_uuid + "/export"
+                                url = base_dst_api_url + '/projects/' + project_uuid + "/export?"
+                                if args.include_base_images:
+                                    url = url + "include_images=yes"
+                                else:
+                                    url = url + "include_images=no"
+                                if args.include_snapshots:
+                                    url = url + "&include_snapshots=yes"
+                                else:
+                                    url = url + "&include_snapshots=no"
+                                if args.reset_mac_addresses:
+                                    url = url + "&reset_mac_addresses=yes"
+                                else:
+                                    url = url + "&reset_mac_addresses=no"
+                                url = url + "&compression=" + args.compression
                                 r = requests.get(url, stream=True, auth=(username, password))
                                 if r.status_code == 200:
                                     r.raw.decode_content = True
                                     filename = str(server) + "_" + project['name'] + "_" + project_uuid + "_" + \
-                                                             time.strftime("%Y%m%d-%H%M%S") + ".zip"
+                                               time.strftime("%Y%m%d-%H%M%S") + "." + args.compression
                                     shutil.copyfileobj(r.raw, open(os.path.join(args.export_to_dir, filename), 'wb'))
-                                    print("#### Project %s (%s) exported to file: %s from server: %s"
-                                                % (project['name'], project['project_id'], filename, server))
+                                    print("#### Project %s (%s) exported to file: %s (%s bytes) from server: %s"
+                                          % (project['name'], project['project_id'], filename,
+                                             os.stat(os.path.join(args.export_to_dir, filename)).st_size, server))
                                 else:
                                     logger.fatal("Unable to export project from source server.")
                                     raise ProxyError()
@@ -309,7 +351,7 @@ def main():
 
                                     # deleting project
                                     print("#### Deleting project UUID %s on server: %s"
-                                                % (project_uuid, config_servers[server]))
+                                          % (project_uuid, config_servers[server]))
                                     r = requests.delete(base_dst_api_url + '/projects/' + project_uuid,
                                                         auth=(username, password))
                                     if not r.status_code == 204:
@@ -322,9 +364,37 @@ def main():
                                     print("    WARNING: Project UUID %s to delete found on server: %s, use --force"
                                           " to really remove it." % (project_uuid, config_servers[server]))
 
+                            if args.duplicate:
+                                project_name = project["name"]
+                                if args.duplicates_per_target_server > 0:
+                                    duplicates_created_on_server = 0
+                                else:
+                                    duplicate_number = args.duplicate_start
+                                while duplicate_number <= args.duplicate_end:
+                                    if args.duplicate_name is not None:
+                                        duplicate_project_name = args.duplicate_name + str(duplicate_number)
+                                    else:
+                                        duplicate_project_name = project_name + str(duplicate_number)
+                                    print("#### Duplicating project %s (%s) on server: %s, new name: %s"
+                                          % (project_name, project_uuid, config_servers[server],
+                                             duplicate_project_name))
+                                    url = base_dst_api_url + '/projects/' + project_uuid + "/duplicate"
+                                    json_data = {'name': duplicate_project_name,
+                                                 'reset_mac_addresses': args.reset_mac_addresses}
+                                    data = json.dumps(json_data)
+                                    r = requests.post(url, data, auth=(username, password))
+                                    if not r.status_code == 201:
+                                        logger.fatal("Unable to duplicate project on target server.")
+                                        raise ProxyError()
+                                    duplicate_number = duplicate_number + 1
+                                    if args.duplicates_per_target_server > 0:
+                                        duplicates_created_on_server = duplicates_created_on_server + 1
+                                        if duplicates_created_on_server >= args.duplicates_per_target_server:
+                                            break
+
                             if args.show:
                                 print("#### Server: %s, Project Name: %s, Project_ID: %s, Status: %s, "
-                                            % (server, project['name'], project['project_id'], project['status']))
+                                      % (server, project['name'], project['project_id'], project['status']))
 
                             if args.start:
                                 print(
@@ -366,7 +436,7 @@ def main():
                                 url = base_dst_api_url + '/projects/' + project['project_id'] + "/close"
                                 data = "{}"
                                 r = requests.post(url, data, auth=(username, password))
-                                if not r.status_code == 201:
+                                if not r.status_code == 201 and not r.status_code == 204:
                                     logger.fatal("Unable to close project. Project does not exist or is corrupted?")
                                     raise ProxyError()
 

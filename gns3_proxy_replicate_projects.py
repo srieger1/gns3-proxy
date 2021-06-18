@@ -24,7 +24,7 @@ import datetime
 import tempfile
 import requests
 
-VERSION = (0, 4)
+VERSION = (0, 5)
 __version__ = '.'.join(map(str, VERSION[0:2]))
 __description__ = 'GNS3 Proxy Replicate Projects'
 __author__ = 'Sebastian Rieger'
@@ -53,6 +53,10 @@ DEFAULT_DELETE_TARGET_PROJECT = False
 DEFAULT_INJECT_REPLICATION_NOTE = False
 DEFAULT_LOG_LEVEL = 'INFO'
 DEFAULT_FORCE = False
+DEFAULT_DUPLICATE = False
+DEFAULT_INCLUDE_BASE_IMAGES = False
+DEFAULT_INCLUDE_SNAPSHOTS = False
+DEFAULT_RESET_MAC_ADDRESSES = False
 
 
 class ProxyError(Exception):
@@ -79,12 +83,35 @@ def parse_args(args):
                         help='Force action without further prompt. E.g., overwrite or delete existing projects '
                              'without further verification.')
 
+    parser.add_argument('--include-base-images', action='store_true', default=DEFAULT_INCLUDE_BASE_IMAGES,
+                        help='Include base images in the export used to replicate the project.')
+    parser.add_argument('--include-snapshots', action='store_true', default=DEFAULT_INCLUDE_SNAPSHOTS,
+                        help='Force action without further prompt. E.g., overwrite or delete existing projects '
+                             'without further verification.')
+    parser.add_argument('--reset-mac-addresses', action='store_true', default=DEFAULT_RESET_MAC_ADDRESSES,
+                        help='Reset all mac addresses in the exported project.')
+    parser.add_argument('--compression', type=str, default='zip',
+                        help='Compress exported project used for the replication. Possible values \'zip\', \'bzip2\''
+                             '\'lzma\', \'none\'.')
+
     project_group = parser.add_mutually_exclusive_group(required=True)
     project_group.add_argument('--project-id', type=str,
                                help='Project UUID to copy.')
     project_group.add_argument('--project-name', type=str,
                                help='Project name to copy. Can be specified as a regular expression to match '
                                     'multiple projects.')
+
+    parser.add_argument('--duplicate-target-project', action='store_true', default=DEFAULT_DUPLICATE,
+                        help='Duplicate project on target.')
+    parser.add_argument('--duplicate-name', type=str,
+                        help='Name to use as a prefix for the duplicated project. An ascending number from'
+                             '--duplicate-start to --duplicate-end will be appended to the project name.')
+    parser.add_argument('--duplicate-start', type=int, default=1,
+                        help='Start numbering of duplicates using the specified number.')
+    parser.add_argument('--duplicate-end', type=int, default=1,
+                        help='End numbering of duplicates using the specified number.')
+    parser.add_argument('--duplicates-per-target-server', type=int, default=0,
+                        help='Number of duplicates per server. Distribute duplicates across matched target servers.')
 
     parser.add_argument('--inject-replication-note', action='store_true', default=DEFAULT_INJECT_REPLICATION_NOTE,
                         help='Whether to inject a note containing the target server name and additional replication'
@@ -208,7 +235,8 @@ def main():
 
         for project in projects:
             project_uuid = project['project_id']
-            print("#### Replicating project: %s" % project_uuid)
+            project_name = project['name']
+            print("#### Replicating project: %s (%s)" % (project_name, project_uuid))
             tmp_file = tempfile.TemporaryFile()
 
             # close source project
@@ -222,12 +250,25 @@ def main():
 
             # export source project
             logger.debug("Exporting source project")
-            url = base_src_api_url + '/projects/' + project_uuid + "/export"
+            url = base_src_api_url + '/projects/' + project_uuid + "/export?"
+            if args.include_base_images:
+                url = url + "include_images=yes"
+            else:
+                url = url + "include_images=no"
+            if args.include_snapshots:
+                url = url + "&include_snapshots=yes"
+            else:
+                url = url + "&include_snapshots=no"
+            if args.reset_mac_addresses:
+                url = url + "&reset_mac_addresses=yes"
+            else:
+                url = url + "&reset_mac_addresses=no"
+            url = url + "&compression=" + args.compression
             r = requests.get(url, stream=True, auth=(username, password))
             if r.status_code == 200:
                 r.raw.decode_content = True
                 shutil.copyfileobj(r.raw, tmp_file)
-                logger.debug("Project exported to file: %s" % tmp_file.name)
+                logger.debug("Project exported to file: %s (%s bytes)" % (tmp_file.name, tmp_file.tell()))
             else:
                 logger.fatal("Unable to export project from source server.")
                 raise ProxyError()
@@ -256,8 +297,10 @@ def main():
                              % args.target_server)
                 raise ProxyError()
 
+            duplicate_number = args.duplicate_start
             for target_server_address in target_server_addresses:
-                print("    #### Replicating project: %s to server: %s" % (project_uuid, target_server_address))
+                print("    #### Replicating project: %s (%s) to server: %s " % (
+                    project_name, project_uuid, target_server_address))
                 base_dst_api_url = "http://" + target_server_address + ":" + str(backend_port) + "/v2"
 
                 logger.debug("Checking if target project exists...")
@@ -286,7 +329,8 @@ def main():
                 if args.delete_target_project:
                     if args.force:
                         logger.debug("Deleting destination project")
-                        r = requests.delete(base_dst_api_url + '/projects/' + project_uuid, auth=(username, password))
+                        r = requests.delete(base_dst_api_url + '/projects/' + project_uuid,
+                                            auth=(username, password))
                         if not r.status_code == 204:
                             if r.status_code == 404:
                                 logger.debug("Destination project did not exist before, not deleted")
@@ -294,8 +338,9 @@ def main():
                                 logger.fatal("unable to delete project")
                                 raise ProxyError()
                     else:
-                        print("        WARNING: Project UUID %s to delete found on server: %s, use --force to really "
-                              "remove it." % (project_uuid, target_server_address))
+                        print(
+                            "        WARNING: Project UUID %s to delete found on server: %s, use --force to"
+                            " really remove it." % (project_uuid, target_server_address))
                         continue
 
                 logger.debug("Importing destination project")
@@ -344,42 +389,46 @@ def main():
                                 if 'mac_address' in node['properties']:
                                     if re.fullmatch(args.regenerate_mac_address,
                                                     node['properties']['mac_address']):
-                                        logger.debug('Found MAC address that needs to be changed: %s using match: %s'
-                                                     % (node['properties']['mac_address'],
-                                                        args.regenerate_mac_address))
+                                        logger.debug(
+                                            'Found MAC address that needs to be changed: %s using match: %s'
+                                            % (node['properties']['mac_address'],
+                                               args.regenerate_mac_address))
                                         mac_address = "02:01:00:%02x:%02x:%02x" % (random.randint(0, 255),
                                                                                    random.randint(0, 255),
                                                                                    random.randint(0, 255))
                                         # changing mac address in target project node
                                         print("         Changing mac address of node: %s from: %s to: %s"
-                                                    % (node['name'], node['properties']['mac_address'], mac_address))
+                                              % (node['name'], node['properties']['mac_address'], mac_address))
                                         url = base_dst_api_url + '/projects/' + project_uuid + "/nodes/" \
                                               + node['node_id']
                                         data = '{ "properties": { "mac_address": "' + mac_address + '" } }'
                                         r = requests.put(url, data, auth=(username, password))
                                         if not r.status_code == 200:
-                                            logger.fatal("Unable to change mac address for node: %s in target project."
-                                                         % node['name'])
+                                            logger.fatal(
+                                                "Unable to change mac address for node: %s in target project."
+                                                % node['name'])
                                             raise ProxyError()
                                 if 'mac_addr' in node['properties']:
                                     if re.fullmatch(args.regenerate_mac_address,
                                                     node['properties']['mac_addr']):
-                                        logger.debug('Found MAC address that needs to be changed: %s using match: %s'
-                                                     % (node['properties']['mac_addr'],
-                                                        args.regenerate_mac_address))
+                                        logger.debug(
+                                            'Found MAC address that needs to be changed: %s using match: %s'
+                                            % (node['properties']['mac_addr'],
+                                               args.regenerate_mac_address))
                                         mac_addr = "0201.00%02x.%02x%02x" % (random.randint(0, 255),
-                                                                                   random.randint(0, 255),
-                                                                                   random.randint(0, 255))
+                                                                             random.randint(0, 255),
+                                                                             random.randint(0, 255))
                                         # changing mac address in target project node
                                         print("         Changing mac address of node: %s from: %s to: %s"
-                                                    % (node['name'], node['properties']['mac_addr'], mac_addr))
+                                              % (node['name'], node['properties']['mac_addr'], mac_addr))
                                         url = base_dst_api_url + '/projects/' + project_uuid + "/nodes/" \
                                               + node['node_id']
                                         data = '{ "properties": { "mac_addr": "' + mac_addr + '" } }'
                                         r = requests.put(url, data, auth=(username, password))
                                         if not r.status_code == 200:
-                                            logger.fatal("Unable to change mac address for node: %s in target project."
-                                                         % node['name'])
+                                            logger.fatal(
+                                                "Unable to change mac address for node: %s in target project."
+                                                % node['name'])
                                             raise ProxyError()
 
                 # check if we need to inject a note describing the replication details in the project
@@ -403,10 +452,15 @@ def main():
                            '<text fill=\\"#000000\\" fill-opacity=\\"1.0\\" font-family=\\"TypeWriter\\"' \
                            ' font-size=\\"10.0\\" font-weight=\\"bold\\">' \
                            'Server: ' + str(target_server_address).replace('"', '\\"') + '\\n' \
-                           'Replicated from: ' + str(args.source_server).replace('"', '\\"') + ' ' \
-                           'Project: ' + str(args.project).replace('"', '\\"') + '\\n' \
-                           'Replicated at: ' + str(replication_timestamp).replace('"', '\\"') + '\\n' \
-                           '</text></svg>" }'
+                                                                                         'Replicated from: ' + str(
+                        args.source_server).replace('"', '\\"') \
+                           + ' ' \
+                             'Project: ' \
+                           + str(args.project).replace('"',
+                                                       '\\"') + '\\n' \
+                                                                'Replicated at: ' + str(
+                        replication_timestamp).replace('"', '\\"') + '\\n' \
+                                                                     '</text></svg>" }'
                     r = requests.post(url, data, auth=(username, password))
                     if not r.status_code == 201:
                         logger.fatal("Unable to inject a note describing the replication details in the project")
@@ -421,6 +475,31 @@ def main():
                     if not r.status_code == 201 and not r.status_code == 204:
                         logger.fatal("Unable to close imported project on target server.")
                         raise ProxyError()
+
+                if args.duplicate_target_project:
+                    if args.duplicates_per_target_server > 0:
+                        duplicates_created_on_server = 0
+                    else:
+                        duplicate_number = args.duplicate_start
+                    while duplicate_number <= args.duplicate_end:
+                        if args.duplicate_name is not None:
+                            duplicate_project_name = args.duplicate_name + str(duplicate_number)
+                        else:
+                            duplicate_project_name = project_name + str(duplicate_number)
+                        print("Duplicating target project. New name: %s" % duplicate_project_name)
+                        url = base_dst_api_url + '/projects/' + project_uuid + "/duplicate"
+                        json_data = {'name': duplicate_project_name,
+                                     'reset_mac_addresses': args.reset_mac_addresses}
+                        data = json.dumps(json_data)
+                        r = requests.post(url, data, auth=(username, password))
+                        if not r.status_code == 201:
+                            logger.fatal("Unable to duplicate project on target server.")
+                            raise ProxyError()
+                        duplicate_number = duplicate_number + 1
+                        if args.duplicates_per_target_server > 0:
+                            duplicates_created_on_server = duplicates_created_on_server + 1
+                            if duplicates_created_on_server >= args.duplicates_per_target_server:
+                                break
 
             # project is replicated close temp file
             tmp_file.close()
