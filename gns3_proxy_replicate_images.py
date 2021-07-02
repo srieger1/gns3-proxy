@@ -177,6 +177,7 @@ def main():
         r = requests.get(url, auth=(username, password))
         if not r.status_code == 200:
             logger.fatal("Could not list images.")
+            logger.debug("Status code: " + str(r.status_code) + " Text:" + r.text)
             raise ProxyError()
         else:
             image_results = json.loads(r.text)
@@ -281,6 +282,7 @@ def main():
                     r_export = requests.get(url, stream=True, auth=(username, password))
                     if not r_export.status_code == 200:
                         logger.fatal("Unable to export image from source server.")
+                        logger.debug("Status code: " + str(r.status_code) + " Text:" + r.text)
                         raise ProxyError()
 
                     start_timestamp = int(round(time.time()))
@@ -325,9 +327,11 @@ def main():
                     if not r_import.status_code == 200:
                         if r_import.status_code == 403:
                             logger.fatal("Forbidden to import image on target server.")
+                            logger.debug("Status code: " + str(r.status_code) + " Text:" + r.text)
                             raise ProxyError()
                         else:
                             logger.fatal("Unable to import image on target server.")
+                            logger.debug("Status code: " + str(r.status_code) + " Text:" + r.text)
                             raise ProxyError()
                     else:
                         end_timestamp = int(round(time.time()))
@@ -338,6 +342,7 @@ def main():
 
                 else:
                     logger.fatal("Could not get status of images from server %s." % target_server_name)
+                    logger.debug("Status code: " + str(r.status_code) + " Text:" + r.text)
                     raise ProxyError()
 
         print("Done.")

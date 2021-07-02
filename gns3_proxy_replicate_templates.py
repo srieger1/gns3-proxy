@@ -177,6 +177,7 @@ def main():
                 src_new_template_api = True
         else:
             logger.fatal("Could not connect to target server. Could not determine its version.")
+            logger.debug("Status code: " + str(r.status_code) + " Text:" + r.text)
             raise ProxyError()
 
         logger.debug("Searching source templates")
@@ -189,6 +190,7 @@ def main():
         r = requests.get(url, auth=(username, password))
         if not r.status_code == 200:
             logger.fatal("Could not list templates.")
+            logger.debug("Status code: " + str(r.status_code) + " Text:" + r.text)
             raise ProxyError()
         else:
             template_results = json.loads(r.text)
@@ -346,6 +348,7 @@ def main():
                         raise ProxyError()
                 else:
                     logger.fatal("Could not connect to source server. Could not determine its version.")
+                    logger.debug("Status code: " + str(r.status_code) + " Text:" + r.text)
                     raise ProxyError()
 
                 logger.debug("Checking if target template name exists...")
@@ -383,6 +386,7 @@ def main():
                                     logger.debug("Template did not exist before, not deleted")
                                 else:
                                     logger.fatal("unable to delete template")
+                                    logger.debug("Status code: " + str(r.status_code) + " Text:" + r.text)
                                     raise ProxyError()
                             else:
                                 print("#### Deleted template name %s on server: %s"
@@ -429,6 +433,7 @@ def main():
                                         logger.debug("Template did not exist before, not deleted")
                                     else:
                                         logger.fatal("unable to delete template")
+                                        logger.debug("Status code: " + str(r.status_code) + " Text:" + r.text)
                                         raise ProxyError()
                                 else:
                                     print("#### Deleted template id %s on server: %s"
@@ -460,6 +465,7 @@ def main():
 
                 else:
                     logger.fatal("Could not get status of templates from server %s." % target_server_address)
+                    logger.debug("Status code: " + str(r.status_code) + " Text:" + r.text)
                     raise ProxyError()
 
         print("Done.")

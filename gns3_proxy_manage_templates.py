@@ -195,6 +195,7 @@ def main():
                             new_template_api = True
                     else:
                         logger.fatal("Could not connect to target server. Could not determine its version.")
+                        logger.debug("Status code: " + str(r.status_code) + " Text:" + r.text)
                         raise ProxyError()
 
                     if args.show:
@@ -221,6 +222,7 @@ def main():
                                           % (server, template['name'], template['template_type']))
                         else:
                             logger.fatal("Could not get status of templates from.")
+                            logger.debug("Status code: " + str(r.status_code) + " Text:" + r.text)
                             raise ProxyError()
 
                     if args.delete:
@@ -264,6 +266,7 @@ def main():
                                                 logger.debug("Template did not exist before, not deleted")
                                             else:
                                                 logger.fatal("unable to delete template")
+                                                logger.debug("Status code: " + str(r.status_code) + " Text:" + r.text)
                                                 raise ProxyError()
                                         else:
                                             print("#### Deleted template %s on server: %s"
@@ -273,6 +276,7 @@ def main():
                                               " to really remove it." % (template['name'], config_servers[server]))
                         else:
                             logger.fatal("Could not get status of templates from server %s." % config_servers[server])
+                            logger.debug("Status code: " + str(r.status_code) + " Text:" + r.text)
                             raise ProxyError()
 
                     if args.export_to_dir:
@@ -380,6 +384,7 @@ def main():
                                             logger.fatal(
                                                 "Could not get settings to export template to new format for %s."
                                                 % template['name'])
+                                            logger.debug("Status code: " + str(r.status_code) + " Text:" + r.text)
                                             raise ProxyError()
 
                                         # old <2.2 GNS3 API used appliance_id and node_type, needs to be
@@ -411,6 +416,7 @@ def main():
 
                         else:
                             logger.fatal("Could not get status of templates from server %s." % config_servers[server])
+                            logger.debug("Status code: " + str(r.status_code) + " Text:" + r.text)
                             raise ProxyError()
 
                     if args.import_from_file:
@@ -477,10 +483,12 @@ def main():
                             if not r.status_code == 201:
                                 if r.status_code == 403:
                                     logger.fatal("Forbidden to import template on target server.")
+                                    logger.debug("Status code: " + str(r.status_code) + " Text:" + r.text)
                                     raise ProxyError()
                                 else:
                                     logger.fatal(
                                         "Unable to import template on target server. Response: %s " % r.content)
+                                    logger.debug("Status code: " + str(r.status_code) + " Text:" + r.text)
                                     raise ProxyError()
                             else:
                                 print("#### Template %s imported from file: %s on server: %s"
@@ -488,6 +496,7 @@ def main():
 
                         else:
                             logger.fatal("Could not get status of templates from server %s." % config_servers[server])
+                            logger.debug("Status code: " + str(r.status_code) + " Text:" + r.text)
                             raise ProxyError()
 
             if base_dst_api_url is None:

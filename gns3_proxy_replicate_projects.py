@@ -216,6 +216,7 @@ def main():
         r = requests.get(url, auth=(username, password))
         if not r.status_code == 200:
             logger.fatal("Could not list projects.")
+            logger.debug("Status code: " + str(r.status_code) + " Text:" + r.text)
             raise ProxyError()
         else:
             project_results = json.loads(r.text)
@@ -246,6 +247,7 @@ def main():
             r = requests.post(url, data, auth=(username, password))
             if not r.status_code == 201 and not r.status_code == 204:
                 logger.fatal("Unable to close source project. Source project does not exist or is corrupted?")
+                logger.debug("Status code: " + str(r.status_code) + " Text:" + r.text)
                 raise ProxyError()
 
             # export source project
@@ -271,6 +273,7 @@ def main():
                 logger.debug("Project exported to file: %s (%s bytes)" % (tmp_file.name, tmp_file.tell()))
             else:
                 logger.fatal("Unable to export project from source server.")
+                logger.debug("Status code: " + str(r.status_code) + " Text:" + r.text)
                 raise ProxyError()
 
             # target handling
@@ -336,6 +339,7 @@ def main():
                                 logger.debug("Destination project did not exist before, not deleted")
                             else:
                                 logger.fatal("unable to delete project")
+                                logger.debug("Status code: " + str(r.status_code) + " Text:" + r.text)
                                 raise ProxyError()
                     else:
                         print(
@@ -355,10 +359,13 @@ def main():
                         raise ProxyError()
                     elif r.status_code == 409:
                         logger.fatal("Project already partially created. Previous import seems to be interrupted. "
-                                     "Try to restart GNS3 target server backend.")
+                                     "Try to restart GNS3 target server backend or use log level debug and check"
+                                     "error status code and reason.")
+                        logger.debug("Status code: " + str(r.status_code) + " Text:" + r.text)
                         raise ProxyError()
                     else:
                         logger.fatal("Unable to import project on target server.")
+                        logger.debug("Status code: " + str(r.status_code) + " Text:" + r.text)
                         raise ProxyError()
 
                 if args.regenerate_mac_address or args.inject_replication_note:
@@ -369,6 +376,7 @@ def main():
                     r = requests.post(url, data, auth=(username, password))
                     if not r.status_code == 201:
                         logger.fatal("Unable to open imported project on target server.")
+                        logger.debug("Status code: " + str(r.status_code) + " Text:" + r.text)
                         raise ProxyError()
 
                 # check if we need to change MAC addresses in the target project
@@ -381,6 +389,7 @@ def main():
                     r = requests.get(url, auth=(username, password))
                     if not r.status_code == 200:
                         logger.fatal("Unable to get nodes from imported project on target server.")
+                        logger.debug("Status code: " + str(r.status_code) + " Text:" + r.text)
                         raise ProxyError()
                     else:
                         nodes = json.loads(r.text)
@@ -407,6 +416,7 @@ def main():
                                             logger.fatal(
                                                 "Unable to change mac address for node: %s in target project."
                                                 % node['name'])
+                                            logger.debug("Status code: " + str(r.status_code) + " Text:" + r.text)
                                             raise ProxyError()
                                 if 'mac_addr' in node['properties']:
                                     if re.fullmatch(args.regenerate_mac_address,
@@ -429,6 +439,7 @@ def main():
                                             logger.fatal(
                                                 "Unable to change mac address for node: %s in target project."
                                                 % node['name'])
+                                            logger.debug("Status code: " + str(r.status_code) + " Text:" + r.text)
                                             raise ProxyError()
 
                 # check if we need to inject a note describing the replication details in the project
@@ -464,6 +475,7 @@ def main():
                     r = requests.post(url, data, auth=(username, password))
                     if not r.status_code == 201:
                         logger.fatal("Unable to inject a note describing the replication details in the project")
+                        logger.debug("Status code: " + str(r.status_code) + " Text:" + r.text)
                         raise ProxyError()
 
                 if args.regenerate_mac_address or args.inject_replication_note:
@@ -474,6 +486,7 @@ def main():
                     r = requests.post(url, data, auth=(username, password))
                     if not r.status_code == 201 and not r.status_code == 204:
                         logger.fatal("Unable to close imported project on target server.")
+                        logger.debug("Status code: " + str(r.status_code) + " Text:" + r.text)
                         raise ProxyError()
 
                 if args.duplicate_target_project:
@@ -494,6 +507,7 @@ def main():
                         r = requests.post(url, data, auth=(username, password))
                         if not r.status_code == 201:
                             logger.fatal("Unable to duplicate project on target server.")
+                            logger.debug("Status code: " + str(r.status_code) + " Text:" + r.text)
                             raise ProxyError()
                         duplicate_number = duplicate_number + 1
                         if args.duplicates_per_target_server > 0:

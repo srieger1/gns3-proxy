@@ -248,6 +248,7 @@ def main():
                                         logger.debug("Project did not exist before, not deleted")
                                     else:
                                         logger.fatal("unable to delete project")
+                                        logger.debug("Status code: " + str(r.status_code) + " Text:" + r.text)
                                         raise ProxyError()
 
                             else:
@@ -264,9 +265,11 @@ def main():
                         if not r.status_code == 201:
                             if r.status_code == 403:
                                 logger.fatal("Forbidden to import project on target server.")
+                                logger.debug("Status code: " + str(r.status_code) + " Text:" + r.text)
                                 raise ProxyError()
                             else:
                                 logger.fatal("Unable to import project on target server.")
+                                logger.debug("Status code: " + str(r.status_code) + " Text:" + r.text)
                                 raise ProxyError()
                         else:
                             print("#### Project %s imported from file: %s on server: %s"
@@ -278,6 +281,7 @@ def main():
                         r = requests.get(url, auth=(username, password))
                         if not r.status_code == 200:
                             logger.fatal("Could not list projects.")
+                            logger.debug("Status code: " + str(r.status_code) + " Text:" + r.text)
                             raise ProxyError()
                         else:
                             project_results = json.loads(r.text)
@@ -305,6 +309,7 @@ def main():
                                 r = requests.post(url, data, auth=(username, password))
                                 if not r.status_code == 201 and not r.status_code == 204:
                                     logger.fatal("Unable to close project. Project does not exist or is corrupted?")
+                                    logger.debug("Status code: " + str(r.status_code) + " Text:" + r.text)
                                     raise ProxyError()
 
                                 # export project
@@ -334,6 +339,7 @@ def main():
                                              os.stat(os.path.join(args.export_to_dir, filename)).st_size, server))
                                 else:
                                     logger.fatal("Unable to export project from source server.")
+                                    logger.debug("Status code: " + str(r.status_code) + " Text:" + r.text)
                                     raise ProxyError()
 
                             if args.delete:
@@ -359,6 +365,7 @@ def main():
                                             logger.debug("Project did not exist before, not deleted")
                                         else:
                                             logger.fatal("unable to delete project")
+                                            logger.debug("Status code: " + str(r.status_code) + " Text:" + r.text)
                                             raise ProxyError()
                                 else:
                                     print("    WARNING: Project UUID %s to delete found on server: %s, use --force"
@@ -385,6 +392,7 @@ def main():
                                     r = requests.post(url, data, auth=(username, password))
                                     if not r.status_code == 201:
                                         logger.fatal("Unable to duplicate project on target server.")
+                                        logger.debug("Status code: " + str(r.status_code) + " Text:" + r.text)
                                         raise ProxyError()
                                     duplicate_number = duplicate_number + 1
                                     if args.duplicates_per_target_server > 0:
@@ -407,6 +415,7 @@ def main():
                                 r = requests.post(url, data, auth=(username, password))
                                 if not r.status_code == 201:
                                     logger.fatal("Unable to open project on target server.")
+                                    logger.debug("Status code: " + str(r.status_code) + " Text:" + r.text)
                                     raise ProxyError()
 
                                 # Starting project
@@ -416,6 +425,7 @@ def main():
                                 r = requests.post(url, data, auth=(username, password))
                                 if not r.status_code == 204:
                                     logger.fatal("Unable to start project on target server.")
+                                    logger.debug("Status code: " + str(r.status_code) + " Text:" + r.text)
                                     raise ProxyError()
 
                             if args.stop:
@@ -429,6 +439,7 @@ def main():
                                 r = requests.post(url, data, auth=(username, password))
                                 if not r.status_code == 204:
                                     logger.fatal("Unable to stop project on target server.")
+                                    logger.debug("Status code: " + str(r.status_code) + " Text:" + r.text)
                                     raise ProxyError()
 
                                 # Closing project
@@ -438,6 +449,7 @@ def main():
                                 r = requests.post(url, data, auth=(username, password))
                                 if not r.status_code == 201 and not r.status_code == 204:
                                     logger.fatal("Unable to close project. Project does not exist or is corrupted?")
+                                    logger.debug("Status code: " + str(r.status_code) + " Text:" + r.text)
                                     raise ProxyError()
 
             if base_dst_api_url is None:
