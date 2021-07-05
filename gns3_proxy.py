@@ -26,7 +26,7 @@
 
 # TODO: LDAP integration for user login? Would require SSL connection to server which was dropped for GNS3 2.x, if
 #       we tackle this, also authentication for console access could be addressed (e.g., using websockify instead of
-#       telnet, using Auth or Token as in VIRL)
+#       telnet, using Auth or Token as in VIRL/CML-P)
 
 # TODO: Remove duplicate code fragments, esp. in gns3_proxy tools
 

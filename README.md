@@ -1,7 +1,7 @@
 gns3-proxy
 ==========
 
-Proof-of-concept for a Proxy Server for GNS3. The proxy is configured as a 
+Proxy Server for GNS3. The proxy is configured as a 
 regular remote server in the GNS3-GUI, as the GNS3-GUI client does not yet 
 support proxies [gns3-gui issue #2696](https://github.com/GNS3/gns3-gui/issues/2696). Basic idea 
 is to allow the use of central GNS3 server backends for classroom / lab setups,
@@ -34,17 +34,23 @@ Changes/enhancements to proxy.py:
 - Definition of users (username and password used in GNS3-GUI) for authentication and authorization at the proxy, proxy replaces credentials for backend servers
 - Selection (mapping) of GNS3 backend server and possibility of load-balancing based on username (using regexp)
 - Filtering of denied requests to server backends (based on username, REST/HTTP method/URL path/headers/body (using regexp)
+- Filtering of project list for individual users
 - Configuration file to allow basic proxy configuration as well as GNS3 backend server, users, mappings and request filters
 - Support for REST calls (GET requests with body etc., not handled by proxy.py)
 - Fixes and tweaks to allow the connection to GNS3 backends, especially keeping connections alive and leaving HTTP headers to support direct passthrough of WebSocket connections
 - Basic access logging/status monitoring support
 
 Further utilities provided to use the proxy:
-- [gns3_proxy_manage_projects.py](https://github.com/srieger1/gns3-proxy/blob/develop/gns3_proxy_manage_projects.py) allows management of projects on backend servers, e.g., bulk import, export,
-  start, stop, delete projects on all or certain backend servers based on regexp.
+- [gns3_proxy_manage_projects.py](https://github.com/srieger1/gns3-proxy/blob/develop/gns3_proxy_manage_projects.py) allows management of projects on backend servers, e.g., bulk import/export,
+  start, stop, delete, duplicate projects on all or certain backend servers based on regexp.
 - [gns3_proxy_replicate_projects.py](https://github.com/srieger1/gns3-proxy/blob/develop/gns3_proxy_replicate_projects.py) supports replication of projects across backend servers.
 
-gns3_proxy_manage_project.py and gns3_proxy_replicate_projects.py be combined with [cron entry](https://github.com/srieger1/gns3-proxy/blob/develop/gns3_proxy_crontab) to run tasks periodically.   
+gns3_proxy_manage_project.py and gns3_proxy_replicate_projects.py can be combined with [cron entry](https://github.com/srieger1/gns3-proxy/blob/develop/gns3_proxy_crontab) to run tasks periodically.   
+
+- [gns3_proxy_manage_images.py](https://github.com/srieger1/gns3-proxy/blob/develop/gns3_proxy_manage_images.py) import/export of images on backend servers.
+- [gns3_proxy_replicate_images.py](https://github.com/srieger1/gns3-proxy/blob/develop/gns3_proxy_replicate_images.py) supports replication of images across backend servers.
+- [gns3_proxy_manage_templates.py](https://github.com/srieger1/gns3-proxy/blob/develop/gns3_proxy_manage_templates.py) allows management of templates (router, switches etc. in the palette) on backend servers.
+- [gns3_proxy_replicate_templates.py](https://github.com/srieger1/gns3-proxy/blob/develop/gns3_proxy_replicate_templates.py) supports replication of templates across backend servers.
 
 Concept
 -------
@@ -101,10 +107,10 @@ The `[proxy]` section contains following parameters for gns3-proxy:
 - **backend_port** TCP port the backend servers listen on (default: 3080, standard GNS3 server port)
 - **default_server** Default server backend to use if no individual mapping for the user was found. Can be omitted to use explicit mapping (default: gns3-1)
 - **backlog** Backlog of the proxy. Increase to allow the processing of more concurrent requests (default: 1000)
-- **server-recvbuf-size** Server receive buffer size (TCP socket) of the proxy in bytes. Increase this value for better performance of large responses from backend servers (default: 8192, recommended for production: 1048576)
-- **client-recvbuf-size** Client receive buffer size (TCP socket) of the proxy in bytes. Increase this value for better performance of large requests from clients (default: 8192, recommended for production: 1048576)
+- **server-recvbuf-size** Server receive buffer size (TCP socket) of the proxy in bytes. Increase this value for better performance of large responses from backend servers (default: 65536, recommended for production: 1048576)
+- **client-recvbuf-size** Client receive buffer size (TCP socket) of the proxy in bytes. Increase this value for better performance of large requests from clients (default: 65536, recommended for production: 1048576)
 - **open-file-limit** Maximum number of parallel open files (socket fds) of the proxy (default: 1024)
-- **inactivity-timeout** Log level. Increase to DEBUG for debugging output. (default: 300)
+- **inactivity-timeout** Timeout for inactive connections through the proxy. E.g., relevant for web terminal connections passing through the proxy that will be closed after this timeout if inactive. (default: 300)
 
 The `[servers]` section contains the defined backend servers (server_name=ip_address), e.g.:
 
@@ -143,7 +149,9 @@ rule2="user(.*)":"POST":"(.*)/nodes$":"":""
 rule3="user(.*)":"POST":"(.*)/links$":"":""
 rule4="user(.*)":"POST":"(.*)/drawings$":"":""
 rule5="user(.*)":"POST":"(.*)/appliances/(.*)":"":""
-rule6="user(.*)":"DELETE":"":"":""
+rule6="user(.*)":"POST":"(.*)/compute":"":""
+rule7="user(.*)":"POST":"(.*)/compute/(.*)":"":""
+rule8="user(.*)":"DELETE":"":"":""
 ```
 
 Installing a new server backend
