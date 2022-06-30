@@ -295,162 +295,162 @@ def main():
                                         logger.debug('matched name of: %s' % project)
                                         projects.append(project)
 
-                        if len(projects) == 0:
-                            logger.fatal("Specified project not found.")
-                            raise ProxyError()
+                            if len(projects) == 0:
+                                print("#### No matching projects found on server: %s"
+                                      % (server))
 
-                        for project in projects:
-                            project_uuid = project['project_id']
-                            if args.export_to_dir:
-                                # Closing project
-                                logger.debug("Closing project")
-                                url = base_dst_api_url + '/projects/' + project_uuid + "/close"
-                                data = "{}"
-                                r = requests.post(url, data, auth=(username, password))
-                                if not r.status_code == 201 and not r.status_code == 204:
-                                    logger.fatal("Unable to close project. Project does not exist or is corrupted?")
-                                    logger.debug("Status code: " + str(r.status_code) + " Text:" + r.text)
-                                    raise ProxyError()
-
-                                # export project
-                                logger.debug("Exporting project")
-                                url = base_dst_api_url + '/projects/' + project_uuid + "/export?"
-                                if args.include_base_images:
-                                    url = url + "include_images=yes"
-                                else:
-                                    url = url + "include_images=no"
-                                if args.include_snapshots:
-                                    url = url + "&include_snapshots=yes"
-                                else:
-                                    url = url + "&include_snapshots=no"
-                                if args.reset_mac_addresses:
-                                    url = url + "&reset_mac_addresses=yes"
-                                else:
-                                    url = url + "&reset_mac_addresses=no"
-                                url = url + "&compression=" + args.compression
-                                r = requests.get(url, stream=True, auth=(username, password))
-                                if r.status_code == 200:
-                                    r.raw.decode_content = True
-                                    filename = str(server) + "_" + project['name'] + "_" + project_uuid + "_" + \
-                                               time.strftime("%Y%m%d-%H%M%S") + "." + args.compression
-                                    shutil.copyfileobj(r.raw, open(os.path.join(args.export_to_dir, filename), 'wb'))
-                                    print("#### Project %s (%s) exported to file: %s (%s bytes) from server: %s"
-                                          % (project['name'], project['project_id'], filename,
-                                             os.stat(os.path.join(args.export_to_dir, filename)).st_size, server))
-                                else:
-                                    logger.fatal("Unable to export project from source server.")
-                                    logger.debug("Status code: " + str(r.status_code) + " Text:" + r.text)
-                                    raise ProxyError()
-
-                            if args.delete:
-                                if args.force:
-                                    # close destination project
-                                    logger.debug("Closing destination project")
+                            for project in projects:
+                                project_uuid = project['project_id']
+                                if args.export_to_dir:
+                                    # Closing project
+                                    logger.debug("Closing project")
                                     url = base_dst_api_url + '/projects/' + project_uuid + "/close"
                                     data = "{}"
                                     r = requests.post(url, data, auth=(username, password))
                                     if not r.status_code == 201 and not r.status_code == 204:
-                                        if r.status_code == 404:
-                                            logger.debug("Project did not exist before, not closed")
-                                        else:
-                                            raise ProxyError()
-
-                                    # deleting project
-                                    print("#### Deleting project UUID %s on server: %s"
-                                          % (project_uuid, config_servers[server]))
-                                    r = requests.delete(base_dst_api_url + '/projects/' + project_uuid,
-                                                        auth=(username, password))
-                                    if not r.status_code == 204:
-                                        if r.status_code == 404:
-                                            logger.debug("Project did not exist before, not deleted")
-                                        else:
-                                            logger.fatal("unable to delete project")
-                                            logger.debug("Status code: " + str(r.status_code) + " Text:" + r.text)
-                                            raise ProxyError()
-                                else:
-                                    print("    WARNING: Project UUID %s to delete found on server: %s, use --force"
-                                          " to really remove it." % (project_uuid, config_servers[server]))
-
-                            if args.duplicate:
-                                project_name = project["name"]
-                                if args.duplicates_per_target_server > 0:
-                                    duplicates_created_on_server = 0
-                                else:
-                                    duplicate_number = args.duplicate_start
-                                while duplicate_number <= args.duplicate_end:
-                                    if args.duplicate_name is not None:
-                                        duplicate_project_name = args.duplicate_name + str(duplicate_number)
-                                    else:
-                                        duplicate_project_name = project_name + str(duplicate_number)
-                                    print("#### Duplicating project %s (%s) on server: %s, new name: %s"
-                                          % (project_name, project_uuid, config_servers[server],
-                                             duplicate_project_name))
-                                    url = base_dst_api_url + '/projects/' + project_uuid + "/duplicate"
-                                    json_data = {'name': duplicate_project_name,
-                                                 'reset_mac_addresses': args.reset_mac_addresses}
-                                    data = json.dumps(json_data)
-                                    r = requests.post(url, data, auth=(username, password))
-                                    if not r.status_code == 201:
-                                        logger.fatal("Unable to duplicate project on target server.")
+                                        logger.fatal("Unable to close project. Project does not exist or is corrupted?")
                                         logger.debug("Status code: " + str(r.status_code) + " Text:" + r.text)
                                         raise ProxyError()
-                                    duplicate_number = duplicate_number + 1
+
+                                    # export project
+                                    logger.debug("Exporting project")
+                                    url = base_dst_api_url + '/projects/' + project_uuid + "/export?"
+                                    if args.include_base_images:
+                                        url = url + "include_images=yes"
+                                    else:
+                                        url = url + "include_images=no"
+                                    if args.include_snapshots:
+                                        url = url + "&include_snapshots=yes"
+                                    else:
+                                        url = url + "&include_snapshots=no"
+                                    if args.reset_mac_addresses:
+                                        url = url + "&reset_mac_addresses=yes"
+                                    else:
+                                        url = url + "&reset_mac_addresses=no"
+                                    url = url + "&compression=" + args.compression
+                                    r = requests.get(url, stream=True, auth=(username, password))
+                                    if r.status_code == 200:
+                                        r.raw.decode_content = True
+                                        filename = str(server) + "_" + project['name'] + "_" + project_uuid + "_" + \
+                                                   time.strftime("%Y%m%d-%H%M%S") + "." + args.compression
+                                        shutil.copyfileobj(r.raw, open(os.path.join(args.export_to_dir, filename), 'wb'))
+                                        print("#### Project %s (%s) exported to file: %s (%s bytes) from server: %s"
+                                              % (project['name'], project['project_id'], filename,
+                                                 os.stat(os.path.join(args.export_to_dir, filename)).st_size, server))
+                                    else:
+                                        logger.fatal("Unable to export project from source server.")
+                                        logger.debug("Status code: " + str(r.status_code) + " Text:" + r.text)
+                                        raise ProxyError()
+
+                                if args.delete:
+                                    if args.force:
+                                        # close destination project
+                                        logger.debug("Closing destination project")
+                                        url = base_dst_api_url + '/projects/' + project_uuid + "/close"
+                                        data = "{}"
+                                        r = requests.post(url, data, auth=(username, password))
+                                        if not r.status_code == 201 and not r.status_code == 204:
+                                            if r.status_code == 404:
+                                                logger.debug("Project did not exist before, not closed")
+                                            else:
+                                                raise ProxyError()
+
+                                        # deleting project
+                                        print("#### Deleting project UUID %s on server: %s"
+                                              % (project_uuid, config_servers[server]))
+                                        r = requests.delete(base_dst_api_url + '/projects/' + project_uuid,
+                                                            auth=(username, password))
+                                        if not r.status_code == 204:
+                                            if r.status_code == 404:
+                                                logger.debug("Project did not exist before, not deleted")
+                                            else:
+                                                logger.fatal("unable to delete project")
+                                                logger.debug("Status code: " + str(r.status_code) + " Text:" + r.text)
+                                                raise ProxyError()
+                                    else:
+                                        print("    WARNING: Project UUID %s to delete found on server: %s, use --force"
+                                              " to really remove it." % (project_uuid, config_servers[server]))
+
+                                if args.duplicate:
+                                    project_name = project["name"]
                                     if args.duplicates_per_target_server > 0:
-                                        duplicates_created_on_server = duplicates_created_on_server + 1
-                                        if duplicates_created_on_server >= args.duplicates_per_target_server:
-                                            break
+                                        duplicates_created_on_server = 0
+                                    else:
+                                        duplicate_number = args.duplicate_start
+                                    while duplicate_number <= args.duplicate_end:
+                                        if args.duplicate_name is not None:
+                                            duplicate_project_name = args.duplicate_name + str(duplicate_number)
+                                        else:
+                                            duplicate_project_name = project_name + str(duplicate_number)
+                                        print("#### Duplicating project %s (%s) on server: %s, new name: %s"
+                                              % (project_name, project_uuid, config_servers[server],
+                                                 duplicate_project_name))
+                                        url = base_dst_api_url + '/projects/' + project_uuid + "/duplicate"
+                                        json_data = {'name': duplicate_project_name,
+                                                     'reset_mac_addresses': args.reset_mac_addresses}
+                                        data = json.dumps(json_data)
+                                        r = requests.post(url, data, auth=(username, password))
+                                        if not r.status_code == 201:
+                                            logger.fatal("Unable to duplicate project on target server.")
+                                            logger.debug("Status code: " + str(r.status_code) + " Text:" + r.text)
+                                            raise ProxyError()
+                                        duplicate_number = duplicate_number + 1
+                                        if args.duplicates_per_target_server > 0:
+                                            duplicates_created_on_server = duplicates_created_on_server + 1
+                                            if duplicates_created_on_server >= args.duplicates_per_target_server:
+                                                break
 
-                            if args.show:
-                                print("#### Server: %s, Project Name: %s, Project_ID: %s, Status: %s, "
-                                      % (server, project['name'], project['project_id'], project['status']))
+                                if args.show:
+                                    print("#### Server: %s, Project Name: %s, Project_ID: %s, Status: %s, "
+                                          % (server, project['name'], project['project_id'], project['status']))
 
-                            if args.start:
-                                print(
-                                    "#### Opening and starting project: %s on %s" % (project['project_id'], server))
+                                if args.start:
+                                    print(
+                                        "#### Opening and starting project: %s on %s" % (project['project_id'], server))
 
-                                # Opening project
-                                logger.debug("Opening target project")
-                                url = base_dst_api_url + '/projects/' + project['project_id'] + "/open"
-                                data = "{}"
-                                r = requests.post(url, data, auth=(username, password))
-                                if not r.status_code == 201:
-                                    logger.fatal("Unable to open project on target server.")
-                                    logger.debug("Status code: " + str(r.status_code) + " Text:" + r.text)
-                                    raise ProxyError()
+                                    # Opening project
+                                    logger.debug("Opening target project")
+                                    url = base_dst_api_url + '/projects/' + project['project_id'] + "/open"
+                                    data = "{}"
+                                    r = requests.post(url, data, auth=(username, password))
+                                    if not r.status_code == 201:
+                                        logger.fatal("Unable to open project on target server.")
+                                        logger.debug("Status code: " + str(r.status_code) + " Text:" + r.text)
+                                        raise ProxyError()
 
-                                # Starting project
-                                logger.debug("Starting destination project")
-                                url = base_dst_api_url + '/projects/' + project['project_id'] + "/nodes/start"
-                                data = "{}"
-                                r = requests.post(url, data, auth=(username, password))
-                                if not r.status_code == 204:
-                                    logger.fatal("Unable to start project on target server.")
-                                    logger.debug("Status code: " + str(r.status_code) + " Text:" + r.text)
-                                    raise ProxyError()
+                                    # Starting project
+                                    logger.debug("Starting destination project")
+                                    url = base_dst_api_url + '/projects/' + project['project_id'] + "/nodes/start"
+                                    data = "{}"
+                                    r = requests.post(url, data, auth=(username, password))
+                                    if not r.status_code == 204:
+                                        logger.fatal("Unable to start project on target server.")
+                                        logger.debug("Status code: " + str(r.status_code) + " Text:" + r.text)
+                                        raise ProxyError()
 
-                            if args.stop:
-                                print(
-                                    "#### Stopping and closing project: %s on %s" % (project['project_id'], server))
+                                if args.stop:
+                                    print(
+                                        "#### Stopping and closing project: %s on %s" % (project['project_id'], server))
 
-                                # Stopping project
-                                logger.debug("Stopping destination project")
-                                url = base_dst_api_url + '/projects/' + project['project_id'] + "/nodes/stop"
-                                data = "{}"
-                                r = requests.post(url, data, auth=(username, password))
-                                if not r.status_code == 204:
-                                    logger.fatal("Unable to stop project on target server.")
-                                    logger.debug("Status code: " + str(r.status_code) + " Text:" + r.text)
-                                    raise ProxyError()
+                                    # Stopping project
+                                    logger.debug("Stopping destination project")
+                                    url = base_dst_api_url + '/projects/' + project['project_id'] + "/nodes/stop"
+                                    data = "{}"
+                                    r = requests.post(url, data, auth=(username, password))
+                                    if not r.status_code == 204:
+                                        logger.fatal("Unable to stop project on target server.")
+                                        logger.debug("Status code: " + str(r.status_code) + " Text:" + r.text)
+                                        raise ProxyError()
 
-                                # Closing project
-                                logger.debug("Closing project")
-                                url = base_dst_api_url + '/projects/' + project['project_id'] + "/close"
-                                data = "{}"
-                                r = requests.post(url, data, auth=(username, password))
-                                if not r.status_code == 201 and not r.status_code == 204:
-                                    logger.fatal("Unable to close project. Project does not exist or is corrupted?")
-                                    logger.debug("Status code: " + str(r.status_code) + " Text:" + r.text)
-                                    raise ProxyError()
+                                    # Closing project
+                                    logger.debug("Closing project")
+                                    url = base_dst_api_url + '/projects/' + project['project_id'] + "/close"
+                                    data = "{}"
+                                    r = requests.post(url, data, auth=(username, password))
+                                    if not r.status_code == 201 and not r.status_code == 204:
+                                        logger.fatal("Unable to close project. Project does not exist or is corrupted?")
+                                        logger.debug("Status code: " + str(r.status_code) + " Text:" + r.text)
+                                        raise ProxyError()
 
             if base_dst_api_url is None:
                 logger.fatal("Could not find target server %s." % args.target_server)
