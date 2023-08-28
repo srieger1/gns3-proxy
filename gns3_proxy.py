@@ -983,6 +983,7 @@ class HTTP(TCP):
                       backend_port=self.backend_port,
                       server_recvbuf_size=self.server_recvbuf_size,
                       client_recvbuf_size=self.client_recvbuf_size,
+                      inactivity_timeout=self.inactivity_timeout,
                       default_server=self.default_server,
                       config_servers=self.config_servers,
                       config_users=self.config_users,
@@ -1100,7 +1101,7 @@ def main():
     #
     # time after breaking connection for console
     # default is 300s
-    inactivity_timeout = config.get('proxy', 'inactivity-timeout', fallback=300)
+    inactivity_timeout = config.getint('proxy', 'inactivity-timeout', fallback=300)
 
     # read servers from config
     if 'servers' in config.sections():
