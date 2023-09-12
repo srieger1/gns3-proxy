@@ -633,11 +633,11 @@ class Proxy(threading.Thread):
                             continue
                         if source_ip in resolved_ips:
                             break
-                        else:
-                            logger.error(
-                                "Request contains proxy auth header and source IP address %s " % source_ip +
-                                "is not found in auth-whitelist.")
-                            raise ProxyAuthenticationFailed()
+                    else:
+                        logger.error(
+                            "Request contains proxy auth header and source IP address %s " % source_ip +
+                            "is not found in auth-whitelist.")
+                        raise ProxyAuthenticationFailed()
                 # Determine real IP of the client
                 try:
                     real_ip = self._get_header_value(self.real_ip_header)
