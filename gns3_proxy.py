@@ -774,7 +774,7 @@ class Proxy(threading.Thread):
                         try:
                             backend_server = str(ip_address(self.default_server))
                             logger.debug("Trying to redirecting client %s to default backend server IP %s:%s" % (
-                                self.cleint.real_ip, backend_server, self.backend_port))
+                                self.client.real_ip, backend_server, self.backend_port))
                         except ValueError:
                             logger.fatal(
                                 "Default server %s is neither an entry in server config nor a valid IP address"
