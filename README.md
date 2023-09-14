@@ -32,8 +32,9 @@ Inherited from proxy.py:
 Changes/enhancements to proxy.py:
 - Redirect requests to backend servers (fixed proxying independent from request URL)
 - Definition of users (username and password used in GNS3-GUI) for authentication and authorization at the proxy, proxy replaces credentials for backend servers
+- Support for user authentication via headers, for use with authentication passed from trusted proxies
 - Selection (mapping) of GNS3 backend server and possibility of load-balancing based on username (using regexp)
-- Filtering of denied requests to server backends (based on username, REST/HTTP method/URL path/headers/body (using regexp)
+- Filtering of denied requests to server backends (based on username, REST/HTTP method/URL path/headers/body) (using regexp)
 - Filtering of project list for individual users
 - Configuration file to allow basic proxy configuration as well as GNS3 backend server, users, mappings and request filters
 - Support for REST calls (GET requests with body etc., not handled by proxy.py)
@@ -111,6 +112,10 @@ The `[proxy]` section contains following parameters for gns3-proxy:
 - **client-recvbuf-size** Client receive buffer size (TCP socket) of the proxy in bytes. Increase this value for better performance of large requests from clients (default: 65536, recommended for production: 1048576)
 - **open-file-limit** Maximum number of parallel open files (socket fds) of the proxy (default: 1024)
 - **inactivity-timeout** Timeout for inactive connections through the proxy. E.g., relevant for web terminal connections passing through the proxy that will be closed after this timeout if inactive. (default: 300)
+- **auth-whitelist** Comma-separated list of IP addresses, prefixes, or hosts from which to allow forwarded authentication (default: None)
+- **auth-header** Header from downstream proxy that contains the username (default: X-Auth-Username)
+- **real-ip-header** Header from downstream proxy that contains the originating IP address of the client (default: X-Forwarded-For)
+- **allow-any-user** Determines whether usernames not defined in users section should be allowed to authenticate (default: no)
 
 The `[servers]` section contains the defined backend servers (server_name=ip_address), e.g.:
 
@@ -119,7 +124,7 @@ gns3-1=192.168.76.205
 gns3-2=192.168.76.206
 ```
 
-The `[users]` section defines the users allowed to access the proxy and their passwords (username=password), e.g.:
+The `[users]` section defines the users allowed to access the proxy and their passwords (username=password). If using forwarded authentication and explicitly defining users, it's best practice to give users strong passwords because HTTP Basic Authentication is still allowed as a fallback.
 
 ```
 user1=pass1
@@ -133,8 +138,7 @@ mapping1="user2":"gns3-2"
 mapping2="user(.*)":"gns3-1"
 ```
 
-The `[project-filter]` section allows for filtering projects shown in the project list for individual users. Only
-projects matching the filter (filter_id="username regexp":"project name filter") are listed.
+The `[project-filter]` section allows for filtering projects shown in the project list for individual users. Only projects matching the filter (filter_id="username regexp":"project name filter") are listed.
 
 ```
 filter1="user1":"(.*)Group1(.*)"

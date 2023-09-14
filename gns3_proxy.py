@@ -44,7 +44,7 @@ from collections import namedtuple
 import configparser
 import re
 import time
-from ipaddress import ip_address
+from ipaddress import ip_address,ip_network
 import json
 
 if os.name != 'nt':
@@ -503,13 +503,19 @@ class Proxy(threading.Thread):
     """
 
     def __init__(self, client, backend_auth_code=None, backend_port=3080, server_recvbuf_size=65536,
-                 client_recvbuf_size=65536, inactivity_timeout=300, default_server=None, config_servers=None,
+                 client_recvbuf_size=65536, inactivity_timeout=300, auth_whitelist=None, auth_header='X-Auth-Username',
+                 real_ip_header='X-Forwarded-For', allow_any_user=False, default_server=None, config_servers=None,
                  config_users=None, config_mapping=None, config_project_filter=None, config_deny=None):
         super(Proxy, self).__init__()
 
         self.start_time = self._now()
         self.last_activity = self.start_time
         self.inactivity_timeout = inactivity_timeout
+
+        self.auth_prefixes, self.auth_hosts = self._get_prefixes_and_hosts(auth_whitelist)
+        self.auth_header = auth_header
+        self.real_ip_header = real_ip_header
+        self.allow_any_user = allow_any_user
 
         self.client = client
         self.client_recvbuf_size = client_recvbuf_size
@@ -532,6 +538,34 @@ class Proxy(threading.Thread):
     @staticmethod
     def _now():
         return datetime.datetime.utcnow()
+    
+    @staticmethod
+    def _get_prefixes_and_hosts(net_list):
+        if not net_list:
+            return None, None
+        # Convert comma-separated string to list
+        if type(net_list) is str:
+            net_list = net_list.split(',')
+        # Remove whitespace
+        net_list = [x.strip() for x in net_list]
+        # Sort prefixes and hostnames into separate lists
+        prefixes = list()
+        hosts = list()
+        for entry in net_list:
+            try:
+                prefixes.append(ip_network(entry))
+            except ValueError:
+                # If not an IP, try resolving it
+                try:
+                    socket.getaddrinfo(entry, 80)
+                    hosts.append(entry)
+                except socket.gaierror:
+                    logger.fatal(
+                        "auth whitelist entry %s is not a valid prefix or resolvable hostname " % entry +
+                        "(e.g., 192.168.0.0/24, proxy.example.com)" )
+                    raise ProxyError()
+        prefixes.sort(key=lambda x: x.num_addresses, reverse=True)
+        return prefixes, hosts
 
     def _inactive_for(self):
         return (self._now() - self.last_activity).seconds
@@ -539,6 +573,25 @@ class Proxy(threading.Thread):
     def _is_inactive(self):
         return self._inactive_for() > self.inactivity_timeout
 
+    def _lookup_user(self, username, password=None):
+        if self.config_users is not None and username in self.config_users:
+            # Check submitted password
+            if password == None or self.config_users[username] == password:
+                logger.debug("Successfully authenticated user %s" % username)
+                self.username = username
+            else:
+                logger.error("Wrong password for user %s" % username)
+                raise ProxyAuthenticationFailed()
+        else:
+            logger.error("User %s not found in config" % username)
+            raise ProxyAuthenticationFailed()
+        
+    def _get_header_value(self, key):
+        # Simplifies fetching header values on requests
+        header = key.lower().encode()
+        value = self.request.headers[header][1]
+        return text_(value)
+    
     def _process_request(self, data):
         # once we have connection to the server
         # we don't parse the http request packets
@@ -557,31 +610,75 @@ class Proxy(threading.Thread):
             logger.debug('request parser is in state complete')
 
             # GNS3 Proxy Authentication
-            logger.debug("Received request from client %s" % self.client.addr[0])
+            source_ip = ip_address(self.client.addr[0])
+            logger.debug("Received request from IP %s" % source_ip)
+            logger.debug("Request headers: %s"
+                         % {h[0].decode(): h[1].decode() for h in self.request.headers.values()})
+
+            # Checking if the request came from a proxy allowed for forward authentication
+            if (self.auth_prefixes or self.auth_hosts) and self.auth_header.lower().encode() in self.request.headers.keys():
+                for prefix in self.auth_prefixes:
+                    if source_ip in prefix:
+                        break
+                else:
+                    for host in self.auth_hosts:
+                        try:
+                            # socket.getaddrinfo should be safe to use here, it uses the host's dns cache.
+                            # It could potentially introduce delay if the DNS responses are slow or timeout.
+                            resolved_ips = [ip_address(answer[-1][0]) for answer in socket.getaddrinfo(host, 80)]
+                        except socket.gaierror:
+                            logger.error(
+                                "Problem while resolving hostname %s to IP address. " % host +
+                                "This means the resolution to this host stopped working while proxy was running.")
+                            continue
+                        if source_ip in resolved_ips:
+                            break
+                    else:
+                        logger.error(
+                            "Request contains proxy auth header and source IP address %s " % source_ip +
+                            "is not found in auth-whitelist.")
+                        raise ProxyAuthenticationFailed()
+                # Determine real IP of the client
+                try:
+                    real_ip = self._get_header_value(self.real_ip_header)
+                except KeyError:
+                    logger.error(
+                        "Request contains proxy auth header and %s header is missing from request."
+                        % self.real_ip_header)
+                    raise ProxyAuthenticationFailed()
+                try:
+                    self.client.real_ip = ip_address(real_ip)
+                except ValueError:
+                    logger.error("Value %s for %s header is not a valid IP address." % (real_ip, self.real_ip_header))
+                    raise ProxyAuthenticationFailed()
+                # Get username from the auth header
+                username = self._get_header_value(self.auth_header)
+                logger.debug("Received authentication through downstream proxy %s from client %s with username %s" % (
+                    source_ip, real_ip, username))
+                # Check if user should be allowed
+                if self.allow_any_user:
+                    self.username = username
+                    logger.debug("User %s allowed as allow-any-user is True" % self.username)
+                else:
+                    self._lookup_user(username)
 
             # Checking authentication and authorization of user supplied in request
-            if b'authorization' in self.request.headers:
-                auth_request = text_(base64.b64decode(self.request.headers[b'authorization'][1][6:])).split(":")
-                username = auth_request[0]
-                if auth_request[1]:
-                    password = auth_request[1]
-                else:
-                    # empty password, seems to be sent from GNS3 GUI during connection setup/server discovery
-                    password = None
-                logger.debug("Received Authorization request %s %s %s" % (auth_request, username, password))
-
-                # Lookup user from request in config
-                if self.config_users is not None and username in self.config_users:
-                    # Check submitted password
-                    if self.config_users[username] == password:
-                        logger.debug("Successfully authenticated user %s" % username)
-                        self.username = username
-                    else:
-                        logger.error("Wrong password for user %s" % username)
-                        raise ProxyAuthenticationFailed()
-                else:
-                    logger.error("User %s not found in config" % username)
+            elif b'authorization' in self.request.headers:
+                try:
+                    auth_request = (base64.b64decode(self._get_header_value('authorization')[6:])).decode().split(":")
+                    username, password = auth_request
+                except:
+                    logger.error("Authorization header does not contain valid HTTP Basic credentials.")
                     raise ProxyAuthenticationFailed()
+                logger.debug("Received Authorization request %s %s %s" % (auth_request, username, password))
+                # Lookup user from request in config
+                self._lookup_user(username, password)
+                # Identify real client IP if the request came from a downstream proxy
+                try:
+                    self.client.real_ip = ip_address(self._get_header_value(self.real_ip_header))
+                except:
+                    self.client.real_ip = source_ip
+
             else:
                 logger.error(
                     "Request did not contain an Authorization header. Please provide username and password in client.")
@@ -592,6 +689,10 @@ class Proxy(threading.Thread):
             # retrieval, use as while list containing allowed project IDs
             # a bit of a cosmetic issue, as using Web app and GNS3 client will not show filtered projects anyway
             # only REST calls would be possible
+
+            # TODO: add configuration to match user groups found in headers to mappings, filters, and rules
+            # this would allow matching using group information passed from a downstream proxy and simplifies
+            # user management and securuty
 
             # evaluate denied requests
             if self.config_deny is not None and len(self.config_deny) > 0:
@@ -668,12 +769,12 @@ class Proxy(threading.Thread):
                     if self.config_servers is not None and self.default_server in self.config_servers:
                         backend_server = self.config_servers[self.default_server]
                         logger.debug("Redirecting client %s to default backend server %s:%s" % (
-                            self.client.addr[0], backend_server, self.backend_port))
+                            self.client.real_ip, backend_server, self.backend_port))
                     else:
                         try:
                             backend_server = str(ip_address(self.default_server))
                             logger.debug("Trying to redirecting client %s to default backend server IP %s:%s" % (
-                                self.client.addr[0], backend_server, self.backend_port))
+                                self.client.real_ip, backend_server, self.backend_port))
                         except ValueError:
                             logger.fatal(
                                 "Default server %s is neither an entry in server config nor a valid IP address"
@@ -815,15 +916,24 @@ class Proxy(threading.Thread):
         self.client.queue(data)
 
     def _access_log(self):
+        # TODO: this section desparately needs to be rewritten with f-strings
         host, port = self.server.addr if self.server else (None, None)
+        source_ip=ip_address(self.client.addr[0])
         if self.request.method == b'CONNECT':
             logger.info(
-                '%s:%s - %s %s:%s' % (self.client.addr[0], self.client.addr[1], self.request.method, host, port))
+                '%s:%s - %b %s:%s' % (self.client.addr[0], self.client.addr[1], self.request.method, host, port))
         elif self.request.method:
-            logger.info('%s:%s (%s) - %s %s:%s%s - %s %s - %s bytes (%s threads)' % (
-                self.client.addr[0], self.client.addr[1], self.username, self.request.method, host, port,
-                self.request.build_url(), self.response.code, self.response.reason, len(self.response.raw),
-                threading.active_count()))
+            real_ip = getattr(self.client, 'real_ip', source_ip)
+            if source_ip == real_ip:
+                logger.info('%s:%s (%s) - %s %s:%s%s - %s %s - %s bytes (%s threads)' % (
+                    self.client.addr[0], self.client.addr[1], self.username, self.request.method, host, port,
+                    self.request.build_url(), self.response.code, self.response.reason, len(self.response.raw),
+                    threading.active_count()))
+            else:
+                logger.info('%s via %s:%s (%s) - %s %s:%s%s - %s %s - %s bytes (%s threads)' % (
+                    self.client.real_ip, self.client.addr[0], self.client.addr[1], self.username, self.request.method,
+                    host, port, self.request.build_url(), self.response.code, self.response.reason,
+                    len(self.response.raw), threading.active_count()))
 
     def _get_waitable_lists(self):
         rlist, wlist, xlist = [self.client.conn], [], []
@@ -961,12 +1071,18 @@ class HTTP(TCP):
 
     def __init__(self, hostname='127.0.0.1', port=13080, backlog=100,
                  backend_auth_code=None, backend_port=3080, server_recvbuf_size=65536, client_recvbuf_size=65536,
-                 inactivity_timeout=300, default_server=None, config_servers=None, config_users=None,
-                 config_mapping=None, config_project_filter=None, config_deny=None):
+                 inactivity_timeout=300, auth_whitelist=None, auth_header='X-Auth-Username',
+                 real_ip_header='X-Forwarded-For', allow_any_user=False, default_server=None, config_servers=None,
+                 config_users=None, config_mapping=None, config_project_filter=None, config_deny=None):
         super(HTTP, self).__init__(hostname, port, backlog)
         self.client_recvbuf_size = client_recvbuf_size
         self.server_recvbuf_size = server_recvbuf_size
         self.inactivity_timeout = inactivity_timeout
+
+        self.auth_whitelist = auth_whitelist
+        self.auth_header = auth_header
+        self.real_ip_header = real_ip_header
+        self.allow_any_user = allow_any_user
 
         self.backend_auth_code = backend_auth_code
         self.backend_port = backend_port
@@ -983,6 +1099,11 @@ class HTTP(TCP):
                       backend_port=self.backend_port,
                       server_recvbuf_size=self.server_recvbuf_size,
                       client_recvbuf_size=self.client_recvbuf_size,
+                      inactivity_timeout=self.inactivity_timeout,
+                      auth_whitelist=self.auth_whitelist,
+                      auth_header=self.auth_header,
+                      real_ip_header=self.real_ip_header,
+                      allow_any_user=self.allow_any_user,
                       default_server=self.default_server,
                       config_servers=self.config_servers,
                       config_users=self.config_users,
@@ -1096,11 +1217,35 @@ def main():
     # default: 8192
     open_file_limit = config.getint('proxy', 'open-file-limit', fallback=1024)
 
-    # get  inactivity timeout
+    # get inactivity timeout
     #
     # time after breaking connection for console
     # default is 300s
-    inactivity_timeout = config.get('proxy', 'inactivity-timeout', fallback=300)
+    inactivity_timeout = config.getint('proxy', 'inactivity-timeout', fallback=300)
+
+    # get allowed proxies for authentication
+    #
+    # comma-separated list of IP addresses, prefixes, or hosts from which to allow forwarded authentication
+    # default: None
+    auth_whitelist = config.get('proxy', 'auth-whitelist', fallback=None)
+
+    # get auth header
+    #
+    # header from proxy that contains the username
+    # default: X-Auth-Username
+    auth_header = config.get('proxy', 'auth-header', fallback="X-Auth-Username")
+
+    # get real IP header
+    #
+    # header from proxy that contains the originating IP address of the client
+    # default: X-Forwarded-For
+    real_ip_header = config.get('proxy', 'real-ip-header', fallback="X-Forwarded-For")
+
+    # get allowed users setting
+    #
+    # determines whether usernames not defined in users section should be allowed to authenticate
+    # default: False
+    allow_any_user = config.getboolean('proxy', 'allow-any-user', fallback=False)
 
     # read servers from config
     if 'servers' in config.sections():
@@ -1220,6 +1365,10 @@ def main():
     logger.debug("Config client-recvbuf-size: %s" % client_recvbuf_size)
     logger.debug("Config open-file-limit: %s" % open_file_limit)
     logger.debug("Config inactivity-timeout: %s" % inactivity_timeout)
+    logger.debug("Config auth-whitelist: %s" % auth_whitelist)
+    logger.debug("Config auth-header: %s" % auth_header)
+    logger.debug("Config real-ip-header: %s" % real_ip_header)
+    logger.debug("Config allow-any-user: %s" % allow_any_user)
 
     logger.debug("Config servers: %s" % config_servers)
     logger.debug("Config users: %s" % config_users)
@@ -1238,6 +1387,10 @@ def main():
                      server_recvbuf_size=server_recvbuf_size,
                      client_recvbuf_size=client_recvbuf_size,
                      inactivity_timeout=inactivity_timeout,
+                     auth_whitelist=auth_whitelist,
+                     auth_header=auth_header,
+                     real_ip_header=real_ip_header,
+                     allow_any_user=allow_any_user,
                      default_server=default_server,
                      config_servers=config_servers,
                      config_users=config_users,
